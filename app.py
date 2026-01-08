@@ -37,6 +37,7 @@ dates_2026 = [START_DATE + timedelta(days=i) for i in range(TOTAL_DAYS)]
 baseline_prices = [p_start + slope * i for i in range(TOTAL_DAYS)]
 df_baseline = pd.DataFrame({"Date": dates_2026, "Baseline": baseline_prices})
 df_baseline["Upper_25"] = df_baseline["Baseline"] * 1.25
+df_baseline["Upper_37_5"] = df_baseline["Baseline"] * 1.375  # Exit B: 1.10 * 1.25 = 1.375 (+37.5%)
 df_baseline["Lower_10"] = df_baseline["Baseline"] * 0.90
 
 # --- Helper: Data Fetching with Cache ---
@@ -58,7 +59,7 @@ with st.spinner(f"Fetching live data for {selected_ticker}..."):
 # --- Signal Logic & Metrics ---
 current_price = 0.0
 signal_status = "Waiting for data..."
-signal_type = "neutral" # neutral, buy, reduce
+signal_type = "neutral" # neutral, buy, reduce_1, reduce_2
 
 if not df_real.empty:
     # Flatten MultiIndex if present (yfinance update)
@@ -95,8 +96,9 @@ if not df_real.empty:
     
     if 0 <= day_diff < TOTAL_DAYS:
         curr_baseline = baseline_prices[day_diff]
-        upper_bound = curr_baseline * 1.25
-        lower_bound = curr_baseline * 0.90
+        upper_bound_1 = curr_baseline * 1.25   # +25%
+        upper_bound_2 = curr_baseline * 1.375  # +37.5%
+        lower_bound = curr_baseline * 0.90     # -10%
         
         delta = current_price - curr_baseline
         delta_pct = (delta / curr_baseline) * 100
@@ -105,9 +107,12 @@ if not df_real.empty:
         if current_price <= lower_bound:
             signal_status = "🟢 觸發『買入點 a』 (Buy!)"
             signal_type = "buy"
-        elif current_price >= upper_bound:
-            signal_status = "🔴 觸發『減碼點 a'』 (Reduce!)"
-            signal_type = "reduce"
+        elif current_price >= upper_bound_2:
+            signal_status = "🔴 觸發『第二階段全賣』 (Exit B - Sell Remaining 50%)"
+            signal_type = "reduce_2"
+        elif current_price >= upper_bound_1:
+            signal_status = "🟡 觸發『第一階段減碼』 (Sell 50%)"
+            signal_type = "reduce_1"
         else:
             signal_status = "⚪ 觀望 / 持有 (Hold)"
             signal_type = "neutral"
@@ -122,8 +127,13 @@ if not df_real.empty:
         # Banner
         if signal_type == "buy":
             st.success(f"### ACTION REQUIRED: {signal_status}")
-        elif signal_type == "reduce":
+            st.markdown(f"Price is below -10% (${lower_bound:.2f}).")
+        elif signal_type == "reduce_2":
             st.error(f"### ACTION REQUIRED: {signal_status}")
+            st.markdown(f"**CRITICAL**: Price has reached +37.5% (${upper_bound_2:.2f}). Sell remaining position!")
+        elif signal_type == "reduce_1":
+            st.warning(f"### ACTION REQUIRED: {signal_status}")
+            st.markdown(f"Price has reached +25% (${upper_bound_1:.2f}). Lock in profits on half.")
     else:
         st.warning("Date out of 2026 range.")
 else:
@@ -137,8 +147,9 @@ fig = go.Figure()
 # 1. Baseline
 fig.add_trace(go.Scatter(x=df_baseline["Date"], y=df_baseline["Baseline"], mode='lines', name='Baseline', line=dict(color='gray', width=2)))
 # 2. Bands
-fig.add_trace(go.Scatter(x=df_baseline["Date"], y=df_baseline["Upper_25"], mode='lines', name='+25% (Reduce)', line=dict(color='gray', width=1, dash='dash')))
-fig.add_trace(go.Scatter(x=df_baseline["Date"], y=df_baseline["Lower_10"], mode='lines', name='-10% (Buy)', line=dict(color='gray', width=1, dash='dash')))
+fig.add_trace(go.Scatter(x=df_baseline["Date"], y=df_baseline["Upper_37_5"], mode='lines', name='+37.5% (Full Exit)', line=dict(color='red', width=1, dash='dash')))
+fig.add_trace(go.Scatter(x=df_baseline["Date"], y=df_baseline["Upper_25"], mode='lines', name='+25% (Reduce)', line=dict(color='orange', width=1, dash='dash')))
+fig.add_trace(go.Scatter(x=df_baseline["Date"], y=df_baseline["Lower_10"], mode='lines', name='-10% (Buy)', line=dict(color='green', width=1, dash='dash')))
 
 # 3. Real Data (RED Line)
 if not df_plot.empty:
