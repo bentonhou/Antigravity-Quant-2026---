@@ -117,89 +117,85 @@ if not df_real.empty:
             signal_status = "⚪ 觀望 / 持有 (Hold)"
             signal_type = "neutral"
             
-        # Responsive Metrics HTML
-        # Map signal types to colors
+        # Metrics Row (Responsive HTML)
+        import textwrap
+        
+        # Color mapping
         color_map = {
-            "buy": "#00ff00",       # Bright Green
-            "reduce_1": "#ffcc00",  # Gold/Yellow
+            "buy": "#00ff00",       # Green
+            "reduce_1": "#ffcc00",  # Yellow
             "reduce_2": "#ff4444",  # Red
-            "neutral": "#e0e0e0"    # Off-white
+            "neutral": "#e0e0e0"    # White/Grey
         }
         main_color = color_map.get(signal_type, "#e0e0e0")
 
-        # HTML Structure with CSS Grid and Fluid Typography
-        st.markdown(f"""
-        <style>
-            .metric-container {{
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-                gap: 15px;
-                margin-bottom: 20px;
-            }}
-            .metric-card {{
-                background-color: rgba(255, 255, 255, 0.05); /* Subtle card bg */
-                padding: 15px;
-                border-radius: 10px;
-                text-align: center;
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                transition: transform 0.2s;
-            }}
-            .metric-card:hover {{
-                transform: translateY(-2px);
-                border-color: rgba(255, 255, 255, 0.3);
-            }}
-            .metric-label {{
-                font-size: clamp(0.8rem, 1.2vw, 1.1rem); /* Fluid text */
-                color: #aaaaaa;
-                margin-bottom: 5px;
-            }}
-            .metric-value {{
-                font-size: clamp(1.2rem, 2.5vw, 2.2rem); /* Fluid text */
-                font-weight: 700;
-                color: #ffffff;
-                margin: 0;
-            }}
-            .metric-sub {{
-                font-size: clamp(0.7rem, 0.9vw, 0.9rem);
-                color: #888888;
-                margin-top: 5px;
-            }}
-            .signal-text {{
-                color: {main_color};
-                font-weight: bold;
-            }}
-        </style>
-
-        <div class="metric-container">
-            <!-- Current Price -->
-            <div class="metric-card">
-                <div class="metric-label">Current Price</div>
-                <div class="metric-value">${current_price:.2f}</div>
-                <div class="metric-sub">{last_date.strftime('%Y-%m-%d')}</div>
-            </div>
-            
-            <!-- Baseline -->
-            <div class="metric-card">
-                <div class="metric-label">Baseline Target</div>
-                <div class="metric-value" style="color: #cccccc;">${curr_baseline:.2f}</div>
-                <div class="metric-sub">Expected Value</div>
-            </div>
-
-            <!-- Deviation -->
-            <div class="metric-card">
-                <div class="metric-label">Deviation</div>
-                <div class="metric-value" style="color: {main_color};">{delta_pct:+.2f}%</div>
-                <div class="metric-sub">from Baseline</div>
-            </div>
-
-            <!-- Signal -->
-            <div class="metric-card" style="border-color: {main_color};">
-                <div class="metric-label">Signal</div>
-                <div class="metric-value signal-text" style="font-size: clamp(1rem, 2vw, 1.8rem);">{signal_status.split(' ')[0]}</div>
-                <div class="metric-sub" style="color: {main_color};">{signal_status.split(' ', 1)[1] if ' ' in signal_status else ''}</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(textwrap.dedent(f"""
+<style>
+.metric-container {{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+    justify-content: space-between;
+}}
+.metric-card {{
+    flex: 1 1 140px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+    transition: all 0.3s ease;
+}}
+.metric-card:hover {{
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+}}
+.metric-label {{
+    color: #aaaaaa;
+    font-size: clamp(0.7rem, 2vw, 0.9rem);
+    margin-bottom: 4px;
+}}
+.metric-value {{
+    color: #ffffff;
+    font-size: clamp(1.1rem, 4vw, 1.8rem);
+    font-weight: 600;
+    line-height: 1.2;
+}}
+.metric-sub {{
+    color: #666666;
+    font-size: clamp(0.6rem, 1.5vw, 0.75rem);
+    margin-top: 4px;
+}}
+.signal-value {{
+    font-size: clamp(0.9rem, 3vw, 1.4rem);
+    font-weight: bold;
+    color: {main_color};
+}}
+</style>
+<div class="metric-container">
+<div class="metric-card">
+<div class="metric-label">Current Price</div>
+<div class="metric-value">${current_price:.2f}</div>
+<div class="metric-sub">{last_date.strftime('%Y-%m-%d')}</div>
+</div>
+<div class="metric-card">
+<div class="metric-label">Baseline Target</div>
+<div class="metric-value" style="color: #cccccc;">${curr_baseline:.2f}</div>
+<div class="metric-sub">Expected Value</div>
+</div>
+<div class="metric-card">
+<div class="metric-label">Deviation</div>
+<div class="metric-value" style="color: {main_color};">{delta_pct:+.2f}%</div>
+<div class="metric-sub">from Baseline</div>
+</div>
+<div class="metric-card" style="border-top: 3px solid {main_color};">
+<div class="metric-label">Signal</div>
+<div class="signal-value">{signal_status.split(' ')[0]}</div>
+<div class="metric-sub" style="color: {main_color};">{signal_status.split(' ', 1)[1] if ' ' in signal_status else ''}</div>
+</div>
+</div>
+"""), unsafe_allow_html=True)
         
         # Banner
         if signal_type == "buy":
