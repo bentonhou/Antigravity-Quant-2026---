@@ -21,9 +21,115 @@ TOTAL_DAYS = (END_DATE - START_DATE).days + 1
 st.set_page_config(page_title="Antigravity Quant 2026", layout="wide")
 st.title("Antigravity Quant 2026 - 波段導航儀")
 
+
+# --- Helper: Data Fetching with Cache ---
+import numpy as np
+
+# --- Helper: Data Fetching with Cache ---
+@st.cache_data(ttl=60) # Cache for 60 seconds
+def get_stock_data(ticker_or_tickers):
+    try:
+        # Fetch data from 2026-01-01 to NOW
+        df = yf.download(ticker_or_tickers, start="2026-01-01", interval="1d", progress=False)
+        return df
+    except Exception as e:
+        return pd.DataFrame()
+
+def calculate_status(ticker, price, date_obj):
+    # Re-implement baseline logic here for single point check
+    config = STOCKS_CONFIG[ticker]
+    p_start = config["start"]
+    p_target = config["target"]
+    slope = (p_target - p_start) / (TOTAL_DAYS - 1)
+    
+    # Baseline for date
+    day_diff = (date_obj - START_DATE).days
+    
+    status_icon = "⚪" # Default
+    
+    if 0 <= day_diff < TOTAL_DAYS:
+        curr_baseline = p_start + slope * day_diff
+        upper_bound_1 = curr_baseline * 1.25
+        upper_bound_2 = curr_baseline * 1.375
+        lower_bound = curr_baseline * 0.90
+        
+        if price <= lower_bound:
+            status_icon = "🟢"
+        elif price >= upper_bound_2:
+            status_icon = "🔴"
+        elif price >= upper_bound_1:
+            status_icon = "🟡"
+            
+    return status_icon
+
+def calculate_trend(series, window=5):
+    """
+    Calculate trend based on the slope of the last 'window' days.
+    Returns: "↗" (positive slope) or "↘" (negative/flat slope).
+    """
+    if len(series) < 2:
+        return "ERROR" # Not enough data
+    
+    # Take last N days
+    y = series.tail(window).values
+    x = np.arange(len(y))
+    
+    # Linear Regression: Slope = Cov(x, y) / Var(x)
+    # Or simple: if len is small, just last - first?
+    # Let's use simple numpy polyfit for robustness
+    try:
+        slope, _ = np.polyfit(x, y, 1)
+        return "↗" if slope > 0 else "↘"
+    except:
+        # Fallback to simple diff
+        return "↗" if y[-1] >= y[0] else "↘"
+
+# --- Sidebar Preparation ---
+sidebar_options = {}
+
+# Batch fetch latest checking
+all_tickers_list = list(STOCKS_CONFIG.keys())
+with st.spinner("Updating Market Signals..."):
+    df_all = get_stock_data(" ".join(all_tickers_list))
+
+for ticker in all_tickers_list:
+    icon = "⚪"
+    trend = ""
+    try:
+        # Handle MultiIndex or Single ticker return structure
+        if isinstance(df_all.columns, pd.MultiIndex):
+            if ticker in df_all['Close'].columns:
+                series = df_all['Close'][ticker].dropna()
+                if not series.empty:
+                    last_val = float(series.iloc[-1])
+                    last_t = pd.to_datetime(series.index[-1])
+                    if isinstance(last_t, pd.Series): last_t = last_t.iloc[0]
+                    icon = calculate_status(ticker, last_val, last_t)
+                    trend = calculate_trend(series)
+        else:
+            if len(all_tickers_list) == 1:
+               series = df_all['Close'].dropna() if 'Close' in df_all else df_all.iloc[:,0].dropna()
+               if not series.empty:
+                   last_val = float(series.iloc[-1])
+                   last_t = pd.to_datetime(series.index[-1])
+                   icon = calculate_status(ticker, last_val, last_t)
+                   trend = calculate_trend(series)
+    except Exception as e:
+        pass 
+    
+    label = f"{ticker} {icon}"
+    if trend and trend != "ERROR":
+        label += f" {trend}"
+        
+    sidebar_options[label] = ticker
+
 # --- Sidebar ---
 st.sidebar.header("Asset Selection")
-selected_ticker = st.sidebar.radio("Ticker", list(STOCKS_CONFIG.keys()))
+# Create reverse mapping or just use keys
+display_keys = list(sidebar_options.keys())
+selected_display = st.sidebar.radio("Ticker", display_keys)
+selected_ticker = sidebar_options[selected_display]
+
 auto_refresh = st.sidebar.checkbox("Auto-Refresh (60s)", value=True)
 
 # --- Logic: Baseline ---
@@ -40,20 +146,27 @@ df_baseline["Upper_25"] = df_baseline["Baseline"] * 1.25
 df_baseline["Upper_37_5"] = df_baseline["Baseline"] * 1.375  # Exit B: 1.10 * 1.25 = 1.375 (+37.5%)
 df_baseline["Lower_10"] = df_baseline["Baseline"] * 0.90
 
-# --- Helper: Data Fetching with Cache ---
-@st.cache_data(ttl=60) # Cache for 60 seconds
-def get_stock_data(ticker):
-    try:
-        # Fetch data from 2026-01-01 to NOW
-        # We use a broad range to ensure we capture defaults
-        df = yf.download(ticker, start="2026-01-01",  interval="1d", progress=False)
-        return df
-    except Exception as e:
-        st.error(f"Error fetching data: {e}")
-        return pd.DataFrame()
+# --- Logic: Baseline ---
+config = STOCKS_CONFIG[selected_ticker]
+p_start = config["start"]
+p_target = config["target"]
+slope = (p_target - p_start) / (TOTAL_DAYS - 1)
+
+# Generate Baseline Series
+dates_2026 = [START_DATE + timedelta(days=i) for i in range(TOTAL_DAYS)]
+baseline_prices = [p_start + slope * i for i in range(TOTAL_DAYS)]
+df_baseline = pd.DataFrame({"Date": dates_2026, "Baseline": baseline_prices})
+df_baseline["Upper_25"] = df_baseline["Baseline"] * 1.25
+df_baseline["Upper_37_5"] = df_baseline["Baseline"] * 1.375  # Exit B: 1.10 * 1.25 = 1.375 (+37.5%)
+df_baseline["Lower_10"] = df_baseline["Baseline"] * 0.90
+
 
 # --- Main Logic ---
-with st.spinner(f"Fetching live data for {selected_ticker}..."):
+# Re-fetch specific ticker to ensure we have full history for plotting (though we could slice from df_all)
+# reusing get_stock_data will hit cache if we call it same way. 
+# BUT above we called with " ".join(all), here we usually call single.
+# yfinance might cache locally. Let's just use get_stock_data(selected_ticker) for simplicity of plotting code.
+with st.spinner(f"Loading chart for {selected_ticker}..."):
     df_real = get_stock_data(selected_ticker)
 
 # --- Signal Logic & Metrics ---
@@ -116,6 +229,11 @@ if not df_real.empty:
         else:
             signal_status = "⚪ 觀望 / 持有 (Hold)"
             signal_type = "neutral"
+            
+        # Calculate Trend for Main View
+        trend_arrow = calculate_trend(df_plot['Close_Flat'])
+        if trend_arrow != "ERROR":
+            signal_status += f" {trend_arrow}"
             
         # Metrics Row (Responsive HTML)
         import textwrap
