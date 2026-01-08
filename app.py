@@ -256,19 +256,21 @@ if not df_real.empty:
     margin-bottom: 20px;
     justify-content: space-between;
 }}
-.metric-card {{
-    flex: 1 1 140px;
-    background-color: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 10px;
-    text-align: center;
-    transition: all 0.3s ease;
-}}
-.metric-card:hover {{
-    border-color: rgba(255, 255, 255, 0.3);
-    transform: translateY(-2px);
-}}
+            .metric-card {{
+                flex: 1 1 140px;
+                background-color: #1e1e1e; /* Solid dark background for contrast */
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                padding: 10px;
+                text-align: center;
+                transition: all 0.3s ease;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); /* Add shadow for depth on light bg */
+            }}
+            .metric-card:hover {{
+                border-color: rgba(255, 255, 255, 0.3);
+                transform: translateY(-2px);
+                box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
+            }}
 .metric-label {{
     color: #aaaaaa;
     font-size: clamp(0.7rem, 2vw, 0.9rem);
