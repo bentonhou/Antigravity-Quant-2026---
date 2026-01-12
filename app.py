@@ -354,6 +354,76 @@ if not df_plot.empty:
         line=dict(color='red', width=4)
     ))
 
+# 4. Pre-market Data (Green Line)
+# Fetch intraday data for pre-market
+@st.cache_data(ttl=60)
+def get_intraday_data(ticker):
+    try:
+        # Fetch 1 day of 5m data including pre/post market
+        df = yf.download(ticker, period="1d", interval="5m", prepost=True, progress=False)
+        return df
+    except:
+        return pd.DataFrame()
+
+with st.spinner(f"Checking pre-market data for {selected_ticker}..."):
+    df_intra = get_intraday_data(selected_ticker)
+
+if not df_intra.empty:
+    # Handle MultiIndex if present
+    if isinstance(df_intra.columns, pd.MultiIndex):
+        try:
+             close_series = df_intra['Close'].iloc[:, 0]
+        except:
+             close_series = df_intra.iloc[:, 0]
+    else:
+        close_series = df_intra['Close']
+    
+    # Filter for Pre-market (Before 09:30 Local Market Time)
+    # yfinance usually returns timezone-aware intervals (e.g. America/New_York)
+    # We'll assume the last day in the data is the "current" day we care about
+    if not close_series.empty:
+        last_day = close_series.index[-1].date()
+        day_data = close_series[close_series.index.date == last_day]
+        
+        # 09:30 AM define
+        # We need to be careful with timezones. simplest is to check string time or hour/minute
+        # Market open is 9:30. Pre-market is < 9:30.
+        # Create a boolean mask
+        mask = (day_data.index.hour < 9) | ((day_data.index.hour == 9) & (day_data.index.minute < 30))
+        pre_market_data = day_data[mask]
+        
+        if not pre_market_data.empty:
+            # Check if market has officially opened (Data exists >= 09:30 NY Time)
+            last_timestamp = day_data.index[-1]
+            
+            # Ensure timezone is NY
+            if last_timestamp.tzinfo is None:
+                 last_timestamp = last_timestamp.tz_localize('UTC')
+            last_timestamp_ny = last_timestamp.tz_convert('America/New_York')
+            
+            is_market_open = (last_timestamp_ny.hour > 9) or (last_timestamp_ny.hour == 9 and last_timestamp_ny.minute >= 30)
+
+            # Show Green Line ONLY if market is NOT open
+            if not is_market_open:
+                # Connect the last point of Red Line to first point of Green Line
+                if not df_plot.empty:
+                    last_red_date = df_plot["Date"].iloc[-1]
+                    last_red_price = df_plot["Close_Flat"].iloc[-1]
+                    
+                    # Create a connector point
+                    connector = pd.Series([last_red_price], index=[last_red_date])
+                    
+                    # Prepend to pre-market data
+                    pre_market_data = pd.concat([connector, pre_market_data])
+
+                fig.add_trace(go.Scatter(
+                    x=pre_market_data.index, 
+                    y=pre_market_data.values, 
+                    mode='lines', 
+                    name='Pre-market', 
+                    line=dict(color='#00ff00', width=4) # Matched width
+                ))
+
 fig.update_layout(title=f"{selected_ticker} Wave Navigator", height=600, hovermode="x unified")
 st.plotly_chart(fig, use_container_width=True)
 
