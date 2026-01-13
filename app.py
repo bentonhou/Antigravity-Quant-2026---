@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import time
 
 # --- Configuration ---
+STOCKS_CONFIG = {
     "TSM":  {"start": 319.61, "target": 400.0},
     "NVDA": {"start": 187.20, "target": 265.0},
     "AMD":  {"start": 214.30, "target": 250.0},
