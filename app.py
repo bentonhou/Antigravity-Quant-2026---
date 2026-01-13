@@ -13,6 +13,7 @@ STOCKS_CONFIG = {
     "QCOM": {"start": 173.00, "target": 210.0},
     "AVGO": {"start": 347.62, "target": 435.0},
     "MRVL": {"start": 89.39,  "target": 125.0},
+    "TSM":  {"start": 319.61, "target": 400.0},
 }
 
 START_DATE = datetime(2026, 1, 1)
