@@ -6,14 +6,13 @@ from datetime import datetime, timedelta
 import time
 
 # --- Configuration ---
-STOCKS_CONFIG = {
+    "TSM":  {"start": 319.61, "target": 400.0},
     "NVDA": {"start": 187.20, "target": 265.0},
     "AMD":  {"start": 214.30, "target": 250.0},
     "AMZN": {"start": 237.21, "target": 280.0},
     "QCOM": {"start": 173.00, "target": 210.0},
     "AVGO": {"start": 347.62, "target": 435.0},
     "MRVL": {"start": 89.39,  "target": 125.0},
-    "TSM":  {"start": 319.61, "target": 400.0},
 }
 
 START_DATE = datetime(2026, 1, 1)
