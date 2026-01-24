@@ -4,38 +4,56 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import time
+import numpy as np
 
 # --- Configuration ---
 STOCKS_CONFIG = {
     "TSM":  {"start": 319.61, "target": 400.0},
     "NVDA": {"start": 187.20, "target": 265.0},
     "AMD":  {"start": 214.30, "target": 250.0},
-    "GOOG": {"start": 315.32, "target": 380.0}, # Updated per Jan 2 2026 search
+    "GOOG": {"start": 315.32, "target": 380.0},
     "QCOM": {"start": 173.00, "target": 210.0},
     "AMZN": {"start": 237.21, "target": 280.0},
     "AVGO": {"start": 347.62, "target": 435.0},
     "MRVL": {"start": 89.39,  "target": 125.0},
-    "NOK":  {"start": 6.51,   "target": 8.00},  # Updated per Jan 2 2026 search
+    "NOK":  {"start": 6.51,   "target": 8.00},
 }
-
-# Grouping Structure for Sidebar
-STOCK_GROUPS = [
-    ["TSM"],
-    ["NVDA", "AMD", "GOOG"],
-    ["QCOM", "AMZN", "AVGO", "MRVL"],
-    ["NOK"]
-]
 
 START_DATE = datetime(2026, 1, 1)
 END_DATE = datetime(2026, 12, 31)
 TOTAL_DAYS = (END_DATE - START_DATE).days + 1
 
 st.set_page_config(page_title="Antigravity Quant 2026", layout="wide")
-st.title("Antigravity Quant 2026 - 波段導航儀")
+st.markdown("<h1 style='font-size: 30px;'>Antigravity Quant 2026 - 波段導航儀</h1>", unsafe_allow_html=True)
+st.markdown("""
+<style>
+    /* Hide the drag handle for the sidebar - Multiple selectors for robustness */
+    div[data-testid="stSidebar"] > div:nth-child(2) {
+        display: none !important;
+    }
+    .stSidebar > div:nth-child(2) {
+        display: none !important;
+    }
+    div[class^="stSidebar"] > div[class^="resize-tr"] {
+        display: none !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
+# --- Sidebar Global Settings (Placed early for data dependency) ---
+st.sidebar.header("參數調整(目標價校正)")
+sentiment_label = st.sidebar.select_slider(
+    "Market Sentiment",
+    options=["Optimistic (1.05)", "Base Target (1.00)", "Conservative (0.90)"],
+    value="Base Target (1.00)"
+)
+sentiment_mapping = {
+    "Optimistic (1.05)": 1.05,
+    "Base Target (1.00)": 1.0,
+    "Conservative (0.90)": 0.90
+}
+sentiment_factor = sentiment_mapping[sentiment_label]
 
-# --- Helper: Data Fetching with Cache ---
-import numpy as np
 
 # --- Helper: Data Fetching with Cache ---
 @st.cache_data(ttl=60) # Cache for 60 seconds
@@ -49,11 +67,11 @@ def get_stock_data(ticker_or_tickers):
     except Exception as e:
         return pd.DataFrame()
 
-def calculate_status(ticker, price, date_obj):
+def calculate_status(ticker, price, date_obj, sentiment=1.0):
     # Re-implement baseline logic here for single point check
     config = STOCKS_CONFIG[ticker]
     p_start = config["start"]
-    p_target = config["target"]
+    p_target = config["target"] * sentiment # Apply Sentiment Adjustment
     slope = (p_target - p_start) / (TOTAL_DAYS - 1)
     
     # Baseline for date
@@ -100,15 +118,12 @@ def calculate_trend(series, window=5):
 
 # --- Sidebar Preparation ---
 
-# Flatten list for fetching
-all_tickers_list = [t for group in STOCK_GROUPS for t in group]
-display_map = {} # label -> ticker
+all_tickers_list = list(STOCKS_CONFIG.keys())
+sidebar_options = {}
 
-# Batch fetch latest checking
 with st.spinner("Updating Market Signals..."):
     df_all = get_stock_data(" ".join(all_tickers_list))
 
-# Pre-calculate labels for all tickers
 for ticker in all_tickers_list:
     icon = "⚪"
     trend = ""
@@ -121,7 +136,8 @@ for ticker in all_tickers_list:
                     last_val = float(series.iloc[-1])
                     last_t = pd.to_datetime(series.index[-1])
                     if isinstance(last_t, pd.Series): last_t = last_t.iloc[0]
-                    icon = calculate_status(ticker, last_val, last_t)
+                    # Pass sentiment_factor here
+                    icon = calculate_status(ticker, last_val, last_t, sentiment_factor)
                     trend = calculate_trend(series)
         else:
             if len(all_tickers_list) == 1 and all_tickers_list[0] == ticker:
@@ -129,10 +145,9 @@ for ticker in all_tickers_list:
                if not series.empty:
                    last_val = float(series.iloc[-1])
                    last_t = pd.to_datetime(series.index[-1])
-                   icon = calculate_status(ticker, last_val, last_t)
+                   icon = calculate_status(ticker, last_val, last_t, sentiment_factor)
                    trend = calculate_trend(series)
             elif ticker in df_all.columns: 
-                 # Single level column match fallback
                  pass
 
     except Exception as e:
@@ -142,135 +157,45 @@ for ticker in all_tickers_list:
     if trend and trend != "ERROR":
         label += f" {trend}"
     
-    display_map[label] = ticker # Mapping: "TSM ⚪ ↗" -> "TSM"
+    sidebar_options[label] = ticker
 
-
-# --- Sidebar State Management ---
-if 'selected_ticker' not in st.session_state:
-    st.session_state.selected_ticker = "TSM" # Default
-if 'selected_group_index' not in st.session_state:
-    st.session_state.selected_group_index = 0 # Default Group 0 (TSM)
-
-def update_selection(group_idx):
-    """Callback to handle mutual exclusivity between groups"""
-    # The value of the widget that triggered this callback is in st.session_state[f"group_{group_idx}"]
-    selected_label = st.session_state.get(f"group_{group_idx}")
-    
-    if selected_label:
-        # Update global selected ticker
-        st.session_state.selected_ticker = display_map[selected_label]
-        st.session_state.selected_group_index = group_idx
-        
-        # Explicitly clear other groups in session state to force deselect
-        for i in range(len(STOCK_GROUPS)):
-            if i != group_idx:
-                st.session_state[f"group_{i}"] = None
-
-# --- Sidebar Rendering ---
+# --- Sidebar ---
 st.sidebar.header("Asset Selection")
-
-# CSS to compact the sidebar layout
-st.sidebar.markdown("""
-    <style>
-    /* Compact radio buttons */
-    div[data-testid="stRadio"] > label {
-        display: none !important;
-    }
-    div[data-testid="stRadio"] {
-        margin-top: -15px; 
-        margin-bottom: -15px;
-    }
-    /* Enforce strict row height for options */
-    div[data-testid="stRadio"] div[role="radiogroup"] > label {
-        height: 32px !important;
-        min-height: 32px !important;
-        line-height: 32px !important;
-        margin-bottom: 0px !important;
-        padding-top: 0px !important;
-        padding-bottom: 0px !important;
-        border: none !important;
-    }
-    /* Compact horizontal rules */
-    hr {
-        margin-top: 2px !important;
-        margin-bottom: 2px !important;
-        border-top: 1px solid #555 !important;
-    }
-    /* Adjust container padding if needed */
-    .st-emotion-cache-16txtl3 {
-        padding-top: 0rem;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-selected_ticker = st.session_state.selected_ticker
-
-# Render Groups
-for i, group in enumerate(STOCK_GROUPS):
-    # if i > 0:
-    #      # Visual Separator Removed per user request
-    #     st.sidebar.markdown('<hr style="width: 10%; margin-top: 0px; margin-bottom: 0px; margin-left: 0; border-top: 1px solid #777;">', unsafe_allow_html=True)
-    
-    # Filter labels for this group
-    group_labels = [k for k, v in display_map.items() if v in group]
-    
-    # Determine index
-    current_index = 0 
-    
-    if selected_ticker in group:
-        for idx, lbl in enumerate(group_labels):
-            if display_map[lbl] == selected_ticker:
-                current_index = idx
-                break
-    else:
-        current_index = None 
-
-    new_selection = st.sidebar.radio(
-        f"Group {i}",
-        group_labels,
-        index=current_index,
-        key=f"group_{i}",
-        label_visibility="collapsed",
-        on_change=update_selection, # This runs AFTER interaction
-        args=(i,)
-    )
+# Create reverse mapping or just use keys
+display_keys = list(sidebar_options.keys())
+selected_display = st.sidebar.radio("Ticker", display_keys)
+selected_ticker = sidebar_options[selected_display]
 
 auto_refresh = st.sidebar.checkbox("Auto-Refresh (60s)", value=True)
 
 # --- Logic: Baseline ---
 config = STOCKS_CONFIG[selected_ticker]
 p_start = config["start"]
-p_target = config["target"]
-slope = (p_target - p_start) / (TOTAL_DAYS - 1)
 
-# Generate Baseline Series
+# 1. Base Logic (Sentiment = 1.0)
+p_target_base = config["target"]
+slope_base = (p_target_base - p_start) / (TOTAL_DAYS - 1)
 dates_2026 = [START_DATE + timedelta(days=i) for i in range(TOTAL_DAYS)]
-baseline_prices = [p_start + slope * i for i in range(TOTAL_DAYS)]
-df_baseline = pd.DataFrame({"Date": dates_2026, "Baseline": baseline_prices})
-df_baseline["Upper_25"] = df_baseline["Baseline"] * 1.25
-df_baseline["Upper_37_5"] = df_baseline["Baseline"] * 1.375  # Exit B: 1.10 * 1.25 = 1.375 (+37.5%)
-df_baseline["Lower_10"] = df_baseline["Baseline"] * 0.90
+baseline_prices_base = [p_start + slope_base * i for i in range(TOTAL_DAYS)]
 
-# --- Logic: Baseline ---
-config = STOCKS_CONFIG[selected_ticker]
-p_start = config["start"]
-p_target = config["target"]
-slope = (p_target - p_start) / (TOTAL_DAYS - 1)
+df_base = pd.DataFrame({"Date": dates_2026, "Baseline": baseline_prices_base})
+df_base["Upper_37_5"] = df_base["Baseline"] * 1.375
+df_base["Upper_25"] = df_base["Baseline"] * 1.25
+df_base["Lower_10"] = df_base["Baseline"] * 0.90
 
-# Generate Baseline Series
-dates_2026 = [START_DATE + timedelta(days=i) for i in range(TOTAL_DAYS)]
-baseline_prices = [p_start + slope * i for i in range(TOTAL_DAYS)]
-df_baseline = pd.DataFrame({"Date": dates_2026, "Baseline": baseline_prices})
-df_baseline["Upper_25"] = df_baseline["Baseline"] * 1.25
-df_baseline["Upper_37_5"] = df_baseline["Baseline"] * 1.375  # Exit B: 1.10 * 1.25 = 1.375 (+37.5%)
-df_baseline["Lower_10"] = df_baseline["Baseline"] * 0.90
+# 2. Adjusted Logic (Current Sentiment)
+p_target_adj = config["target"] * sentiment_factor
+slope_adj = (p_target_adj - p_start) / (TOTAL_DAYS - 1)
+baseline_prices_adj = [p_start + slope_adj * i for i in range(TOTAL_DAYS)]
+
+df_adj = pd.DataFrame({"Date": dates_2026, "Baseline": baseline_prices_adj})
+df_adj["Upper_37_5"] = df_adj["Baseline"] * 1.375
+df_adj["Upper_25"] = df_adj["Baseline"] * 1.25
+df_adj["Lower_10"] = df_adj["Baseline"] * 0.90
 
 
 # --- Main Logic ---
-# Re-fetch specific ticker to ensure we have full history for plotting (though we could slice from df_all)
-# reusing get_stock_data will hit cache if we call it same way. 
-# BUT above we called with " ".join(all), here we usually call single.
-# yfinance might cache locally. Let's just use get_stock_data(selected_ticker) for simplicity of plotting code.
+# Re-fetch specific ticker to ensure we have full history for plotting
 with st.spinner(f"Loading chart for {selected_ticker}..."):
     df_real = get_stock_data(selected_ticker)
 
@@ -279,159 +204,159 @@ current_price = 0.0
 signal_status = "Waiting for data..."
 signal_type = "neutral" # neutral, buy, reduce_1, reduce_2
 
+# Use ADJUSTED values for Logic/Metrics
+curr_baseline_val = 0
+lower_bound_val = 0
+upper_bound_1_val = 0
+upper_bound_2_val = 0
+delta_pct = 0.0
+
 if not df_real.empty:
-    # Flatten MultiIndex if present (yfinance update)
+    # Flatten MultiIndex
     if isinstance(df_real.columns, pd.MultiIndex):
         try:
              y_data_series = df_real['Close'].iloc[:, 0]
         except:
-             y_data_series = df_real.iloc[:, 0] # Fallback
+             y_data_series = df_real.iloc[:, 0]
     else:
         y_data_series = df_real['Close']
 
     df_plot = df_real.copy()
     df_plot['Close_Flat'] = y_data_series
-    df_plot = df_plot.reset_index() # Ensure Date is a column
+    df_plot = df_plot.reset_index()
 
-    # Get latest
     last_row = df_plot.iloc[-1]
-    
-    # Ensure pandas timestamp conversion
     last_date = pd.to_datetime(last_row['Date'])
-    
-    # Force scalar extraction logic
     if isinstance(last_date, pd.Series):
         last_date = last_date.iloc[0]
 
     current_price = float(last_row['Close_Flat'])
     
-    # Find matching baseline price for this specific date
     if hasattr(last_date, 'date'):
         day_diff = (last_date - START_DATE).days
     else:
-        # Fallback if somehow still not datetime (e.g. string)
         day_diff = (pd.to_datetime(last_date) - START_DATE).days
     
     if 0 <= day_diff < TOTAL_DAYS:
-        curr_baseline = baseline_prices[day_diff]
-        upper_bound_1 = curr_baseline * 1.25   # +25%
-        upper_bound_2 = curr_baseline * 1.375  # +37.5%
-        lower_bound = curr_baseline * 0.90     # -10%
+        curr_baseline_val = baseline_prices_adj[day_diff]
+        upper_bound_1_val = curr_baseline_val * 1.25
+        upper_bound_2_val = curr_baseline_val * 1.375
+        lower_bound_val = curr_baseline_val * 0.90
         
-        delta = current_price - curr_baseline
-        delta_pct = (delta / curr_baseline) * 100
+        delta = current_price - curr_baseline_val
+        delta_pct = (delta / curr_baseline_val) * 100
         
-        # Signal Judgment
-        if current_price <= lower_bound:
+        if current_price <= lower_bound_val:
             signal_status = "🟢 觸發『買入點 a』 (Buy!)"
             signal_type = "buy"
-        elif current_price >= upper_bound_2:
+        elif current_price >= upper_bound_2_val:
             signal_status = "🔴 觸發『第二階段全賣』 (Exit B - Sell Remaining 50%)"
             signal_type = "reduce_2"
-        elif current_price >= upper_bound_1:
+        elif current_price >= upper_bound_1_val:
             signal_status = "🟡 觸發『第一階段減碼』 (Sell 50%)"
             signal_type = "reduce_1"
         else:
             signal_status = "⚪ 觀望 / 持有 (Hold)"
             signal_type = "neutral"
             
-        # Calculate Trend for Main View
         trend_arrow = calculate_trend(df_plot['Close_Flat'])
         if trend_arrow != "ERROR":
             signal_status += f" {trend_arrow}"
             
-        # Metrics Row (Responsive HTML)
         import textwrap
+        # Color mapping for Signal Card
+        # Buy: Green, Reduce_1: Yellow, Reduce_2: Red, Neutral: Dark
+        card_styles = {
+            "buy":      "background-color: rgba(0, 255, 0, 0.2); border: 1px solid #00ff00;",
+            "reduce_1": "background-color: rgba(255, 204, 0, 0.2); border: 1px solid #ffcc00;",
+            "reduce_2": "background-color: rgba(255, 68, 68, 0.2); border: 1px solid #ff4444;",
+            "neutral":  "background-color: #1e1e1e; border: 1px solid rgba(255, 255, 255, 0.1);"
+        }
         
-        # Color mapping
+        current_card_style = card_styles.get(signal_type, card_styles["neutral"])
+        
         color_map = {
-            "buy": "#00ff00",       # Green
-            "reduce_1": "#ffcc00",  # Yellow
-            "reduce_2": "#ff4444",  # Red
-            "neutral": "#e0e0e0"    # White/Grey
+            "buy": "#00ff00",
+            "reduce_1": "#ffcc00",
+            "reduce_2": "#ff4444",
+            "neutral": "#e0e0e0"
         }
         main_color = color_map.get(signal_type, "#e0e0e0")
 
-        st.markdown(textwrap.dedent(f"""
-<style>
-.metric-container {{
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 20px;
-    justify-content: space-between;
-}}
-            .metric-card {{
-                flex: 1 1 140px;
-                background-color: #1e1e1e; /* Solid dark background for contrast */
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 8px;
-                padding: 10px;
-                text-align: center;
-                transition: all 0.3s ease;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); /* Add shadow for depth on light bg */
-            }}
-            .metric-card:hover {{
-                border-color: rgba(255, 255, 255, 0.3);
-                transform: translateY(-2px);
-                box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
-            }}
-.metric-label {{
-    color: #aaaaaa;
-    font-size: clamp(0.7rem, 2vw, 0.9rem);
-    margin-bottom: 4px;
-}}
-.metric-value {{
-    color: #ffffff;
-    font-size: clamp(1.1rem, 4vw, 1.8rem);
-    font-weight: 600;
-    line-height: 1.2;
-}}
-.metric-sub {{
-    color: #666666;
-    font-size: clamp(0.6rem, 1.5vw, 0.75rem);
-    margin-top: 4px;
-}}
-.signal-value {{
-    font-size: clamp(0.9rem, 3vw, 1.4rem);
-    font-weight: bold;
-    color: {main_color};
-}}
-</style>
-<div class="metric-container">
-<div class="metric-card">
-<div class="metric-label">Current Price</div>
-<div class="metric-value">${current_price:.2f}</div>
-<div class="metric-sub">{last_date.strftime('%Y-%m-%d')}</div>
-</div>
-<div class="metric-card">
-<div class="metric-label">Baseline Target</div>
-<div class="metric-value" style="color: #cccccc;">${curr_baseline:.2f}</div>
-<div class="metric-sub">Expected Value</div>
-</div>
-<div class="metric-card">
-<div class="metric-label">Deviation</div>
-<div class="metric-value" style="color: {main_color};">{delta_pct:+.2f}%</div>
-<div class="metric-sub">from Baseline</div>
-</div>
-<div class="metric-card" style="border-top: 3px solid {main_color};">
-<div class="metric-label">Signal</div>
-<div class="signal-value">{signal_status.split(' ')[0]}</div>
-<div class="metric-sub" style="color: {main_color};">{signal_status.split(' ', 1)[1] if ' ' in signal_status else ''}</div>
-</div>
-</div>
-"""), unsafe_allow_html=True)
+        # Container for Metrics
+        chart_space = st.empty()
         
-        # Banner
-        if signal_type == "buy":
-            st.success(f"### ACTION REQUIRED: {signal_status}")
-            st.markdown(f"Price is below -10% (${lower_bound:.2f}).")
-        elif signal_type == "reduce_2":
-            st.error(f"### ACTION REQUIRED: {signal_status}")
-            st.markdown(f"**CRITICAL**: Price has reached +37.5% (${upper_bound_2:.2f}). Sell remaining position!")
-        elif signal_type == "reduce_1":
-            st.warning(f"### ACTION REQUIRED: {signal_status}")
-            st.markdown(f"Price has reached +25% (${upper_bound_1:.2f}). Lock in profits on half.")
+        with chart_space.container():
+            st.markdown(textwrap.dedent(f"""
+    <style>
+    .metric-container {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 20px;
+        justify-content: space-between;
+    }}
+                .metric-card {{
+                    flex: 1 1 140px;
+                    background-color: #1e1e1e;
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border-radius: 8px;
+                    padding: 10px;
+                    text-align: center;
+                    transition: all 0.3s ease;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+                }}
+                .metric-card:hover {{
+                    border-color: rgba(255, 255, 255, 0.3);
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
+                }}
+    .metric-label {{
+        color: #aaaaaa;
+        font-size: clamp(0.7rem, 2vw, 0.9rem);
+        margin-bottom: 4px;
+    }}
+    .metric-value {{
+        color: #ffffff;
+        font-size: clamp(1.1rem, 4vw, 1.8rem);
+        font-weight: 600;
+        line-height: 1.2;
+    }}
+    .metric-sub {{
+        color: #666666;
+        font-size: clamp(0.6rem, 1.5vw, 0.75rem);
+        margin-top: 4px;
+    }}
+    .signal-value {{
+        font-size: clamp(0.9rem, 3vw, 1.4rem);
+        font-weight: bold;
+        color: #ffffff;
+    }}
+    </style>
+    <div class="metric-container">
+    <div class="metric-card">
+    <div class="metric-label">Current Price</div>
+    <div class="metric-value">${current_price:.2f}</div>
+    <div class="metric-sub">{last_date.strftime('%Y-%m-%d')}</div>
+    </div>
+    <div class="metric-card">
+    <div class="metric-label">Adj Target</div>
+    <div class="metric-value" style="color: #cccccc;">${curr_baseline_val:.2f}</div>
+    <div class="metric-sub">Base: ${baseline_prices_base[day_diff]:.2f} (x{sentiment_factor})</div>
+    </div>
+    <div class="metric-card">
+    <div class="metric-label">Deviation</div>
+    <div class="metric-value" style="color: {main_color};">{delta_pct:+.2f}%</div>
+    <div class="metric-sub">from Adj Base</div>
+    </div>
+    <div class="metric-card" style="{current_card_style}">
+    <div class="metric-label" style="color: #ffffff;">Signal</div>
+    <div class="signal-value">{signal_status.split(' ')[0]}</div>
+    <div class="metric-sub" style="color: #ffffff; opacity: 0.8;">{signal_status.split(' ', 1)[1] if ' ' in signal_status else ''}</div>
+    </div>
+    </div>
+    """), unsafe_allow_html=True)
+            
     else:
         st.warning("Date out of 2026 range.")
 else:
@@ -442,94 +367,59 @@ else:
 # --- Visualization ---
 fig = go.Figure()
 
-# 1. Baseline
-fig.add_trace(go.Scatter(x=df_baseline["Date"], y=df_baseline["Baseline"], mode='lines', name='Baseline', line=dict(color='gray', width=2)))
-# 2. Bands
-fig.add_trace(go.Scatter(x=df_baseline["Date"], y=df_baseline["Upper_37_5"], mode='lines', name='+37.5% (Full Exit)', line=dict(color='red', width=1, dash='dash')))
-fig.add_trace(go.Scatter(x=df_baseline["Date"], y=df_baseline["Upper_25"], mode='lines', name='+25% (Reduce)', line=dict(color='orange', width=1, dash='dash')))
-fig.add_trace(go.Scatter(x=df_baseline["Date"], y=df_baseline["Lower_10"], mode='lines', name='-10% (Buy)', line=dict(color='green', width=1, dash='dash')))
+def add_trace_pair(fig, x, y_base, y_adj, name, color, base_dash=None):
+    # Base
+    fig.add_trace(go.Scatter(
+        x=x, y=y_base, mode='lines', name=f"{name} (Base)", 
+        line=dict(color=color, width=1 if base_dash else 2, dash=base_dash),
+        showlegend=True
+    ))
+    # Adj Shadow
+    if sentiment_factor != 1.0:
+        fig.add_trace(go.Scatter(
+            x=x, y=y_adj, mode='lines', name=f"{name} (Adj)", 
+            line=dict(width=0),
+            fill='tonexty',
+            fillcolor=color.replace(')', ', 0.1)').replace('rgb', 'rgba'),
+            showlegend=False, hoverinfo='skip'
+        ))
 
-# 3. Real Data (RED Line)
+# Add Pairs - Reordered for Logical Legend (Top to Bottom)
+# +37.5% (Red) - Highest
+add_trace_pair(fig, df_base["Date"], df_base["Upper_37_5"], df_adj["Upper_37_5"], "+37.5% (Exit)", "rgb(255, 0, 0)", "dash")
+
+# +25% (Orange)
+add_trace_pair(fig, df_base["Date"], df_base["Upper_25"], df_adj["Upper_25"], "+25% (Reduce)", "rgb(255, 165, 0)", "dash")
+
+# Baseline (Gray)
+add_trace_pair(fig, df_base["Date"], df_base["Baseline"], df_adj["Baseline"], "Baseline", "rgb(128, 128, 128)")
+
+# -10% (Green) - Lowest
+add_trace_pair(fig, df_base["Date"], df_base["Lower_10"], df_adj["Lower_10"], "-10% (Buy)", "rgb(0, 128, 0)", "dash")
+
 if not df_plot.empty:
     fig.add_trace(go.Scatter(
-        x=df_plot["Date"], 
-        y=df_plot["Close_Flat"], 
-        mode='lines', 
-        name='Actual Price', 
+        x=df_plot["Date"], y=df_plot["Close_Flat"], mode='lines', name='Actual Price', 
         line=dict(color='red', width=4)
     ))
 
-# 4. Pre-market Data (Green Line)
-# Fetch intraday data for pre-market
-@st.cache_data(ttl=60)
-def get_intraday_data(ticker):
-    try:
-        # Fetch 1 day of 5m data including pre/post market
-        df = yf.download(ticker, period="1d", interval="5m", prepost=True, progress=False)
-        return df
-    except:
-        return pd.DataFrame()
+fig.update_layout(
+    title=f"{selected_ticker} Wave Navigator", 
+    height=600, 
+    hovermode="x unified",
+    legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=1.02,
+        xanchor="right",
+        x=1
+    )
+)
 
-with st.spinner(f"Checking pre-market data for {selected_ticker}..."):
-    df_intra = get_intraday_data(selected_ticker)
-
-if not df_intra.empty:
-    # Handle MultiIndex if present
-    if isinstance(df_intra.columns, pd.MultiIndex):
-        try:
-             close_series = df_intra['Close'].iloc[:, 0]
-        except:
-             close_series = df_intra.iloc[:, 0]
-    else:
-        close_series = df_intra['Close']
-    
-    # Filter for Pre-market (Before 09:30 Local Market Time)
-    # yfinance usually returns timezone-aware intervals (e.g. America/New_York)
-    # We'll assume the last day in the data is the "current" day we care about
-    if not close_series.empty:
-        last_day = close_series.index[-1].date()
-        day_data = close_series[close_series.index.date == last_day]
-        
-        # 09:30 AM define
-        # We need to be careful with timezones. simplest is to check string time or hour/minute
-        # Market open is 9:30. Pre-market is < 9:30.
-        # Create a boolean mask
-        mask = (day_data.index.hour < 9) | ((day_data.index.hour == 9) & (day_data.index.minute < 30))
-        pre_market_data = day_data[mask]
-        
-        if not pre_market_data.empty:
-            # Check if market has officially opened (Data exists >= 09:30 NY Time)
-            last_timestamp = day_data.index[-1]
-            
-            # Ensure timezone is NY
-            if last_timestamp.tzinfo is None:
-                 last_timestamp = last_timestamp.tz_localize('UTC')
-            last_timestamp_ny = last_timestamp.tz_convert('America/New_York')
-            
-            is_market_open = (last_timestamp_ny.hour > 9) or (last_timestamp_ny.hour == 9 and last_timestamp_ny.minute >= 30)
-
-            # Show Green Line ONLY if market is NOT open
-            if not is_market_open:
-                # Connect the last point of Red Line to first point of Green Line
-                if not df_plot.empty:
-                    last_red_date = df_plot["Date"].iloc[-1]
-                    last_red_price = df_plot["Close_Flat"].iloc[-1]
-                    
-                    # Create a connector point
-                    connector = pd.Series([last_red_price], index=[last_red_date])
-                    
-                    # Prepend to pre-market data
-                    pre_market_data = pd.concat([connector, pre_market_data])
-
-                fig.add_trace(go.Scatter(
-                    x=pre_market_data.index, 
-                    y=pre_market_data.values, 
-                    mode='lines', 
-                    name='Pre-market', 
-                    line=dict(color='#00ff00', width=4) # Matched width
-                ))
-
-fig.update_layout(title=f"{selected_ticker} Wave Navigator", height=600, hovermode="x unified")
+# RENDER CHART IN CONTAINER
+# If chart_space was defined earlier (inside the if), use it. But fig creation is outside.
+# Let's clean up structure. 
+# We'll use a main_block container for everything below header.
 st.plotly_chart(fig, use_container_width=True)
 
 st.markdown("---")
