@@ -10,12 +10,12 @@ STOCKS_CONFIG = {
     "TSM":  {"start": 319.61, "target": 400.0},
     "NVDA": {"start": 187.20, "target": 265.0},
     "AMD":  {"start": 214.30, "target": 250.0},
-    "GOOG": {"start": 190.00, "target": 230.0},
+    "GOOG": {"start": 315.32, "target": 380.0}, # Updated per Jan 2 2026 search
     "QCOM": {"start": 173.00, "target": 210.0},
     "AMZN": {"start": 237.21, "target": 280.0},
     "AVGO": {"start": 347.62, "target": 435.0},
     "MRVL": {"start": 89.39,  "target": 125.0},
-    "NOK":  {"start": 5.00,   "target": 6.50},
+    "NOK":  {"start": 6.51,   "target": 8.00},  # Updated per Jan 2 2026 search
 }
 
 # Grouping Structure for Sidebar
