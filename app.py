@@ -8,17 +8,23 @@ import time
 # --- Configuration ---
 STOCKS_CONFIG = {
     "TSM":  {"start": 319.61, "target": 400.0},
-    "---1": {"start": 0, "target": 0}, # Separator
     "NVDA": {"start": 187.20, "target": 265.0},
     "AMD":  {"start": 214.30, "target": 250.0},
     "GOOG": {"start": 190.00, "target": 230.0},
-    "---2": {"start": 0, "target": 0}, # Separator
     "QCOM": {"start": 173.00, "target": 210.0},
     "AMZN": {"start": 237.21, "target": 280.0},
     "AVGO": {"start": 347.62, "target": 435.0},
     "MRVL": {"start": 89.39,  "target": 125.0},
     "NOK":  {"start": 5.00,   "target": 6.50},
 }
+
+# Grouping Structure for Sidebar
+STOCK_GROUPS = [
+    ["TSM"],
+    ["NVDA", "AMD", "GOOG"],
+    ["QCOM", "AMZN", "AVGO", "MRVL"],
+    ["NOK"]
+]
 
 START_DATE = datetime(2026, 1, 1)
 END_DATE = datetime(2026, 12, 31)
@@ -93,21 +99,17 @@ def calculate_trend(series, window=5):
         return "↗" if y[-1] >= y[0] else "↘"
 
 # --- Sidebar Preparation ---
-sidebar_options = {}
+
+# Flatten list for fetching
+all_tickers_list = [t for group in STOCK_GROUPS for t in group]
+display_map = {} # label -> ticker
 
 # Batch fetch latest checking
-all_tickers_list = list(STOCKS_CONFIG.keys())
-# Filter out connectors for fetching
-fetch_list = [t for t in all_tickers_list if not t.startswith("---")]
-
 with st.spinner("Updating Market Signals..."):
-    df_all = get_stock_data(" ".join(fetch_list))
+    df_all = get_stock_data(" ".join(all_tickers_list))
 
+# Pre-calculate labels for all tickers
 for ticker in all_tickers_list:
-    if ticker.startswith("---"):
-        sidebar_options["────────────────"] = ticker
-        continue
-
     icon = "⚪"
     trend = ""
     try:
@@ -122,18 +124,16 @@ for ticker in all_tickers_list:
                     icon = calculate_status(ticker, last_val, last_t)
                     trend = calculate_trend(series)
         else:
-            if len(fetch_list) == 1 and fetch_list[0] == ticker:
+            if len(all_tickers_list) == 1 and all_tickers_list[0] == ticker:
                series = df_all['Close'].dropna() if 'Close' in df_all else df_all.iloc[:,0].dropna()
                if not series.empty:
                    last_val = float(series.iloc[-1])
                    last_t = pd.to_datetime(series.index[-1])
                    icon = calculate_status(ticker, last_val, last_t)
                    trend = calculate_trend(series)
-            elif ticker in df_all.columns: # fallback if structure is weird but column exists
-                pass # logic needs robust multi-ticker handling
-            
-            # If df_all is just one ticker's data but not this one (shouldn't happen with correct fetch_list logic)
-            pass
+            elif ticker in df_all.columns: 
+                 # Single level column match fallback
+                 pass
 
     except Exception as e:
         pass 
@@ -141,22 +141,78 @@ for ticker in all_tickers_list:
     label = f"{ticker} {icon}"
     if trend and trend != "ERROR":
         label += f" {trend}"
-        
-    sidebar_options[label] = ticker
+    
+    display_map[label] = ticker # Mapping: "TSM ⚪ ↗" -> "TSM"
 
-# --- Sidebar ---
+
+# --- Sidebar State Management ---
+if 'selected_ticker' not in st.session_state:
+    st.session_state.selected_ticker = "TSM" # Default
+if 'selected_group_index' not in st.session_state:
+    st.session_state.selected_group_index = 0 # Default Group 0 (TSM)
+
+def update_selection(group_idx):
+    """Callback to handle mutual exclusivity between groups"""
+    # The value of the widget that triggered this callback is in st.session_state[f"group_{group_idx}"]
+    # We find which label was clicked
+    selected_label = st.session_state[f"group_{group_idx}"]
+    
+    if selected_label:
+        # Update global selected ticker
+        st.session_state.selected_ticker = display_map[selected_label]
+        st.session_state.selected_group_index = group_idx
+        
+        # Reset other groups to None (visually deselect)
+        # Note: streamlit radio doesn't support setting index=None dynamically after init easily 
+        # without key hacks or rerun. 
+        # However, we can use the 'index' parameter in st.radio tied to a variable? 
+        # Actually, simpler: Just let session state drive it.
+
+# --- Sidebar Rendering ---
 st.sidebar.header("Asset Selection")
-# Create reverse mapping or just use keys
-display_keys = list(sidebar_options.keys())
-selected_display = st.sidebar.radio("Ticker", display_keys)
-selected_ticker = sidebar_options[selected_display]
+
+selected_ticker = st.session_state.selected_ticker
+
+# Render Groups
+for i, group in enumerate(STOCK_GROUPS):
+    if i > 0:
+         # Visual Separator: 10% width, non-clickable, left aligned
+        st.sidebar.markdown('<hr style="width: 10%; margin-top: 5px; margin-bottom: 5px; border-top: 1px solid #777;">', unsafe_allow_html=True)
+    
+    # Filter labels for this group
+    group_labels = [k for k, v in display_map.items() if v in group]
+    
+    # Determine index. If the currently selected ticker is in this group, find its index. Else None.
+    current_index = 0 # default fallback
+    is_active_group = False
+    
+    # Check if 'selected_ticker' is in this group
+    if selected_ticker in group:
+        is_active_group = True
+        # Find the specific label that matches the selected ticker
+        # (Need to reconstruct label or search display_map)
+        for idx, lbl in enumerate(group_labels):
+            if display_map[lbl] == selected_ticker:
+                current_index = idx
+                break
+    else:
+        current_index = None # Deselect this group
+
+    # Render
+    # We use a unique key for each group. 
+    # Use 'index' to set selection. 'index=None' allows no selection (requires Streamlit >= 1.29)
+    # If using older streamlit, might default to 0. Let's assume proper version or handle logic.
+    new_selection = st.sidebar.radio(
+        f"Group {i}",
+        group_labels,
+        index=current_index,
+        key=f"group_{i}",
+        label_visibility="collapsed",
+        on_change=update_selection, # This runs AFTER interaction
+        args=(i,)
+    )
 
 auto_refresh = st.sidebar.checkbox("Auto-Refresh (60s)", value=True)
-
-# --- Logic: Handle Separator Selection ---
-if selected_ticker.startswith("---"):
-    st.info("請選擇一個有效的股票代號 (Please select a valid stock)")
-    st.stop()
 
 # --- Logic: Baseline ---
 config = STOCKS_CONFIG[selected_ticker]
