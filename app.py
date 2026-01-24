@@ -8,12 +8,16 @@ import time
 # --- Configuration ---
 STOCKS_CONFIG = {
     "TSM":  {"start": 319.61, "target": 400.0},
+    "---1": {"start": 0, "target": 0}, # Separator
     "NVDA": {"start": 187.20, "target": 265.0},
     "AMD":  {"start": 214.30, "target": 250.0},
-    "AMZN": {"start": 237.21, "target": 280.0},
+    "GOOG": {"start": 190.00, "target": 230.0},
+    "---2": {"start": 0, "target": 0}, # Separator
     "QCOM": {"start": 173.00, "target": 210.0},
+    "AMZN": {"start": 237.21, "target": 280.0},
     "AVGO": {"start": 347.62, "target": 435.0},
     "MRVL": {"start": 89.39,  "target": 125.0},
+    "NOK":  {"start": 5.00,   "target": 6.50},
 }
 
 START_DATE = datetime(2026, 1, 1)
@@ -30,6 +34,8 @@ import numpy as np
 # --- Helper: Data Fetching with Cache ---
 @st.cache_data(ttl=60) # Cache for 60 seconds
 def get_stock_data(ticker_or_tickers):
+    if not ticker_or_tickers.strip():
+        return pd.DataFrame()
     try:
         # Fetch data from 2026-01-01 to NOW
         df = yf.download(ticker_or_tickers, start="2026-01-01", interval="1d", progress=False)
@@ -91,10 +97,17 @@ sidebar_options = {}
 
 # Batch fetch latest checking
 all_tickers_list = list(STOCKS_CONFIG.keys())
+# Filter out connectors for fetching
+fetch_list = [t for t in all_tickers_list if not t.startswith("---")]
+
 with st.spinner("Updating Market Signals..."):
-    df_all = get_stock_data(" ".join(all_tickers_list))
+    df_all = get_stock_data(" ".join(fetch_list))
 
 for ticker in all_tickers_list:
+    if ticker.startswith("---"):
+        sidebar_options["────────────────"] = ticker
+        continue
+
     icon = "⚪"
     trend = ""
     try:
@@ -109,13 +122,19 @@ for ticker in all_tickers_list:
                     icon = calculate_status(ticker, last_val, last_t)
                     trend = calculate_trend(series)
         else:
-            if len(all_tickers_list) == 1:
+            if len(fetch_list) == 1 and fetch_list[0] == ticker:
                series = df_all['Close'].dropna() if 'Close' in df_all else df_all.iloc[:,0].dropna()
                if not series.empty:
                    last_val = float(series.iloc[-1])
                    last_t = pd.to_datetime(series.index[-1])
                    icon = calculate_status(ticker, last_val, last_t)
                    trend = calculate_trend(series)
+            elif ticker in df_all.columns: # fallback if structure is weird but column exists
+                pass # logic needs robust multi-ticker handling
+            
+            # If df_all is just one ticker's data but not this one (shouldn't happen with correct fetch_list logic)
+            pass
+
     except Exception as e:
         pass 
     
@@ -133,6 +152,11 @@ selected_display = st.sidebar.radio("Ticker", display_keys)
 selected_ticker = sidebar_options[selected_display]
 
 auto_refresh = st.sidebar.checkbox("Auto-Refresh (60s)", value=True)
+
+# --- Logic: Handle Separator Selection ---
+if selected_ticker.startswith("---"):
+    st.info("請選擇一個有效的股票代號 (Please select a valid stock)")
+    st.stop()
 
 # --- Logic: Baseline ---
 config = STOCKS_CONFIG[selected_ticker]
