@@ -154,54 +154,67 @@ if 'selected_group_index' not in st.session_state:
 def update_selection(group_idx):
     """Callback to handle mutual exclusivity between groups"""
     # The value of the widget that triggered this callback is in st.session_state[f"group_{group_idx}"]
-    # We find which label was clicked
-    selected_label = st.session_state[f"group_{group_idx}"]
+    selected_label = st.session_state.get(f"group_{group_idx}")
     
     if selected_label:
         # Update global selected ticker
         st.session_state.selected_ticker = display_map[selected_label]
         st.session_state.selected_group_index = group_idx
         
-        # Reset other groups to None (visually deselect)
-        # Note: streamlit radio doesn't support setting index=None dynamically after init easily 
-        # without key hacks or rerun. 
-        # However, we can use the 'index' parameter in st.radio tied to a variable? 
-        # Actually, simpler: Just let session state drive it.
+        # Explicitly clear other groups in session state to force deselect
+        for i in range(len(STOCK_GROUPS)):
+            if i != group_idx:
+                st.session_state[f"group_{i}"] = None
 
 # --- Sidebar Rendering ---
 st.sidebar.header("Asset Selection")
+
+# CSS to compact the sidebar layout
+st.sidebar.markdown("""
+    <style>
+    /* Compact radio buttons */
+    div[data-testid="stRadio"] > label {
+        display: none !important;
+    }
+    div[data-testid="stRadio"] {
+        margin-top: -15px; 
+        margin-bottom: -15px;
+    }
+    /* Compact horizontal rules */
+    hr {
+        margin-top: 2px !important;
+        margin-bottom: 2px !important;
+        border-top: 1px solid #555 !important;
+    }
+    /* Adjust container padding if needed */
+    .st-emotion-cache-16txtl3 {
+        padding-top: 0rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 selected_ticker = st.session_state.selected_ticker
 
 # Render Groups
 for i, group in enumerate(STOCK_GROUPS):
-    if i > 0:
-         # Visual Separator: 10% width, non-clickable, left aligned
-        st.sidebar.markdown('<hr style="width: 10%; margin-top: 5px; margin-bottom: 5px; border-top: 1px solid #777;">', unsafe_allow_html=True)
+    # if i > 0:
+    #      # Visual Separator Removed per user request
+    #     st.sidebar.markdown('<hr style="width: 10%; margin-top: 0px; margin-bottom: 0px; margin-left: 0; border-top: 1px solid #777;">', unsafe_allow_html=True)
     
     # Filter labels for this group
     group_labels = [k for k, v in display_map.items() if v in group]
     
-    # Determine index. If the currently selected ticker is in this group, find its index. Else None.
-    current_index = 0 # default fallback
-    is_active_group = False
+    # Determine index
+    current_index = 0 
     
-    # Check if 'selected_ticker' is in this group
     if selected_ticker in group:
-        is_active_group = True
-        # Find the specific label that matches the selected ticker
-        # (Need to reconstruct label or search display_map)
         for idx, lbl in enumerate(group_labels):
             if display_map[lbl] == selected_ticker:
                 current_index = idx
                 break
     else:
-        current_index = None # Deselect this group
+        current_index = None 
 
-    # Render
-    # We use a unique key for each group. 
-    # Use 'index' to set selection. 'index=None' allows no selection (requires Streamlit >= 1.29)
-    # If using older streamlit, might default to 0. Let's assume proper version or handle logic.
     new_selection = st.sidebar.radio(
         f"Group {i}",
         group_labels,
