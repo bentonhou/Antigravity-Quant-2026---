@@ -180,6 +180,16 @@ st.sidebar.markdown("""
         margin-top: -15px; 
         margin-bottom: -15px;
     }
+    /* Enforce strict row height for options */
+    div[data-testid="stRadio"] div[role="radiogroup"] > label {
+        height: 32px !important;
+        min-height: 32px !important;
+        line-height: 32px !important;
+        margin-bottom: 0px !important;
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
+        border: none !important;
+    }
     /* Compact horizontal rules */
     hr {
         margin-top: 2px !important;
