@@ -37,6 +37,10 @@ st.markdown("""
     div[class^="stSidebar"] > div[class^="resize-tr"] {
         display: none !important;
     }
+    /* Hide Streamlit element toolbar (fullscreen button) */
+    [data-testid="stElementToolbar"] {
+        display: none;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -308,8 +312,6 @@ if not df_real.empty:
                 }}
                 .metric-card:hover {{
                     border-color: rgba(255, 255, 255, 0.3);
-                    transform: translateY(-2px);
-                    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
                 }}
     .metric-label {{
         color: #aaaaaa;
@@ -403,6 +405,23 @@ if not df_plot.empty:
         line=dict(color='red', width=4)
     ))
 
+# --- Calculate Fixed Axis Range ---
+# Determine min/max across all relevant series to fix the view
+y_max_candidates = [df_base["Upper_37_5"].max()]
+y_min_candidates = [df_base["Lower_10"].min()]
+
+if sentiment_factor != 1.0:
+    y_max_candidates.append(df_adj["Upper_37_5"].max())
+    y_min_candidates.append(df_adj["Lower_10"].min())
+
+if not df_plot.empty:
+    y_max_candidates.append(df_plot["Close_Flat"].max())
+    y_min_candidates.append(df_plot["Close_Flat"].min())
+
+y_max_val = max(y_max_candidates)
+y_min_val = min(y_min_candidates)
+y_margin = (y_max_val - y_min_val) * 0.05
+
 fig.update_layout(
     title=f"{selected_ticker} Wave Navigator", 
     height=600, 
@@ -413,6 +432,13 @@ fig.update_layout(
         y=1.02,
         xanchor="right",
         x=1
+    ),
+    yaxis=dict(
+        range=[y_min_val - y_margin, y_max_val + y_margin],
+        fixedrange=True # Disable zoom on Y
+    ),
+    xaxis=dict(
+        fixedrange=True # Disable zoom on X
     )
 )
 
@@ -420,7 +446,17 @@ fig.update_layout(
 # If chart_space was defined earlier (inside the if), use it. But fig creation is outside.
 # Let's clean up structure. 
 # We'll use a main_block container for everything below header.
-st.plotly_chart(fig, use_container_width=True)
+with st.container(border=True):
+    st.plotly_chart(
+        fig, 
+        use_container_width=True,
+        config={
+            'displayModeBar': True,
+            'modeBarButtons': [['toImage']], 
+            'displaylogo': False,
+            'scrollZoom': False
+        }
+    )
 
 st.markdown("---")
 st.markdown(f"**Update Status:** Fetched at {datetime.now().strftime('%H:%M:%S')}")
