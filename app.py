@@ -287,6 +287,33 @@ if not df_real.empty:
         }
         main_color = color_map.get(signal_type, "#e0e0e0")
 
+        # Helper to safely get pre-market data
+        def get_premarket_info(ticker):
+            try:
+                info = yf.Ticker(ticker).info
+                pm_price = info.get('preMarketPrice', None)
+                if pm_price is not None:
+                    return float(pm_price)
+                return None
+            except:
+                return None
+
+        pre_market_price = get_premarket_info(selected_ticker)
+        
+        # Pre-market strings
+        pm_price_str = ""
+        pm_dev_str = ""
+        
+        if pre_market_price:
+            pm_price_str = f'<span style="color: #00ff00; font-size: 0.8em; margin-left: 5px;">(Pre: ${pre_market_price:.2f})</span>'
+            
+            # Calculate Deviation for Pre-market
+            # Using same baseline as current day (valid approximation for pre-market of same day)
+            if curr_baseline_val > 0:
+                pm_delta = pre_market_price - curr_baseline_val
+                pm_pct = (pm_delta / curr_baseline_val) * 100
+                pm_dev_str = f'<span style="color: #00ff00; font-size: 0.8em; margin-left: 5px;">(Pre: {pm_pct:+.2f}%)</span>'
+
         # Container for Metrics
         chart_space = st.empty()
         
@@ -338,7 +365,7 @@ if not df_real.empty:
     <div class="metric-container">
     <div class="metric-card">
     <div class="metric-label">Current Price</div>
-    <div class="metric-value">${current_price:.2f}</div>
+    <div class="metric-value">${current_price:.2f}{pm_price_str}</div>
     <div class="metric-sub">{last_date.strftime('%Y-%m-%d')}</div>
     </div>
     <div class="metric-card">
@@ -348,7 +375,7 @@ if not df_real.empty:
     </div>
     <div class="metric-card">
     <div class="metric-label">Deviation</div>
-    <div class="metric-value" style="color: {main_color};">{delta_pct:+.2f}%</div>
+    <div class="metric-value" style="color: #ffffff;">{delta_pct:+.2f}%{pm_dev_str}</div>
     <div class="metric-sub">from Adj Base</div>
     </div>
     <div class="metric-card" style="{current_card_style}">
