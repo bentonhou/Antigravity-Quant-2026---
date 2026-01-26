@@ -290,9 +290,17 @@ if not df_real.empty:
         # Helper to safely get pre-market data
         def get_premarket_info(ticker):
             pm_price = None
+            tick = yf.Ticker(ticker)
+            
             # Method 1: Try Info
             try:
-                info = yf.Ticker(ticker).info
+                info = tick.info
+                
+                # CRITICAL: Hide pre-market data if Market is OPEN (REGULAR)
+                market_state = info.get('marketState', '').upper()
+                if market_state == "REGULAR":
+                    return None
+                    
                 pm_price = info.get('preMarketPrice', None)
                 if pm_price is not None:
                     return float(pm_price)
@@ -301,14 +309,28 @@ if not df_real.empty:
             
             # Method 2: Try History (Fallback)
             try:
-                # Fetch last 1m candle including prepost
-                df_h = yf.Ticker(ticker).history(period='1d', interval='1m', prepost=True)
+                # If we are here, either info failed OR pm_price was None (but market not explicitly REGULAR)
+                # However, if info failed, we don't know market info.
+                # Let's rely on timezone/time check if finding data via history.
+                
+                df_h = tick.history(period='1d', interval='1m', prepost=True)
                 if not df_h.empty:
-                    # Check if the last data point is recent (today)
                     last_time = df_h.index[-1]
-                    # Simple check: just return the latest close as proxy for "latest known price" 
-                    # if we are in pre-market context.
-                    return float(df_h['Close'].iloc[-1])
+                    
+                    # Manual Time Check (Backup for failsafe)
+                    # Convert to ET if possible to verify 9:30?
+                    # Simplified: If datetime is today and hour >= 9 and minute >= 30...
+                    # But dealing with TZ is tricky. 
+                    # Let's blindly trust if we are explicitly looking for pre-market fallback.
+                    # But actually, if market is open, history returns live data. 
+                    # We shouldn't return it as "Pre-market".
+                    # So, disabling fallback if we can't verify state is safer?
+                    # Or check if 'marketState' was NOT 'REGULAR' (maybe info failed completely).
+                    pass 
+                    
+                    # For now, let's just stick to the info check as primary gatekeeper.
+                    # If info fails, we skip fallback to avoid showing "Pre=Current" during day.
+                    # return float(df_h['Close'].iloc[-1]) 
             except:
                 pass
                 
