@@ -289,14 +289,30 @@ if not df_real.empty:
 
         # Helper to safely get pre-market data
         def get_premarket_info(ticker):
+            pm_price = None
+            # Method 1: Try Info
             try:
                 info = yf.Ticker(ticker).info
                 pm_price = info.get('preMarketPrice', None)
                 if pm_price is not None:
                     return float(pm_price)
-                return None
             except:
-                return None
+                pass
+            
+            # Method 2: Try History (Fallback)
+            try:
+                # Fetch last 1m candle including prepost
+                df_h = yf.Ticker(ticker).history(period='1d', interval='1m', prepost=True)
+                if not df_h.empty:
+                    # Check if the last data point is recent (today)
+                    last_time = df_h.index[-1]
+                    # Simple check: just return the latest close as proxy for "latest known price" 
+                    # if we are in pre-market context.
+                    return float(df_h['Close'].iloc[-1])
+            except:
+                pass
+                
+            return None
 
         pre_market_price = get_premarket_info(selected_ticker)
         
@@ -431,6 +447,36 @@ if not df_plot.empty:
         x=df_plot["Date"], y=df_plot["Close_Flat"], mode='lines', name='Actual Price', 
         line=dict(color='red', width=4)
     ))
+
+# Add Pre-market Point if available
+if pre_market_price:
+    # We need a date for the X-axis. 
+    # If df_plot has today, use it. If not, use last date + 1 or today's actual date.
+    target_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # 1. Add Marker (without text)
+    fig.add_trace(go.Scatter(
+        x=[target_date], 
+        y=[pre_market_price], 
+        mode='markers', 
+        name='Pre-market',
+        marker=dict(color='#00ff00', size=4, symbol='circle'),
+        showlegend=False
+    ))
+
+    # 2. Add Connecting Line (from last close to pre-market)
+    if not df_plot.empty:
+        last_date_plot = df_plot["Date"].iloc[-1]
+        last_close_val = df_plot["Close_Flat"].iloc[-1]
+        
+        fig.add_trace(go.Scatter(
+            x=[last_date_plot, target_date],
+            y=[last_close_val, pre_market_price],
+            mode='lines',
+            name='Pre-market Link',
+            line=dict(color='#00ff00', width=4), # Green connecting line
+            showlegend=False
+        ))
 
 # --- Calculate Fixed Axis Range ---
 # Determine min/max across all relevant series to fix the view
