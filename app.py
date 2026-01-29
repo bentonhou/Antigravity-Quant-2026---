@@ -11,6 +11,7 @@ STOCKS_CONFIG = {
     "TSM":  {"start": 319.61, "target": 400.0},
     "NVDA": {"start": 187.20, "target": 265.0},
     "AMD":  {"start": 214.30, "target": 250.0},
+    "MSFT": {"start": 472.94, "target": 580.0},
     "GOOG": {"start": 315.32, "target": 380.0},
     "QCOM": {"start": 173.00, "target": 210.0},
     "AMZN": {"start": 237.21, "target": 280.0},
