@@ -310,28 +310,16 @@ if not df_real.empty:
             
             # Method 2: Try History (Fallback)
             try:
-                # If we are here, either info failed OR pm_price was None (but market not explicitly REGULAR)
-                # However, if info failed, we don't know market info.
-                # Let's rely on timezone/time check if finding data via history.
+                # Fallback to history if info failed or returned None
+                tick_history_period = '1d'
+                # If it's early Monday morning, we might need more history to find Friday's close? 
+                # '1d' usually covers the last trading session if market is closed.
                 
-                df_h = tick.history(period='1d', interval='1m', prepost=True)
+                df_h = tick.history(period='5d', interval='1m', prepost=True)
                 if not df_h.empty:
-                    last_time = df_h.index[-1]
-                    
-                    # Manual Time Check (Backup for failsafe)
-                    # Convert to ET if possible to verify 9:30?
-                    # Simplified: If datetime is today and hour >= 9 and minute >= 30...
-                    # But dealing with TZ is tricky. 
-                    # Let's blindly trust if we are explicitly looking for pre-market fallback.
-                    # But actually, if market is open, history returns live data. 
-                    # We shouldn't return it as "Pre-market".
-                    # So, disabling fallback if we can't verify state is safer?
-                    # Or check if 'marketState' was NOT 'REGULAR' (maybe info failed completely).
-                    pass 
-                    
-                    # For now, let's just stick to the info check as primary gatekeeper.
-                    # If info fails, we skip fallback to avoid showing "Pre=Current" during day.
-                    # return float(df_h['Close'].iloc[-1]) 
+                    # Get the very last available price
+                    last_price = float(df_h['Close'].iloc[-1])
+                    return last_price
             except:
                 pass
                 
