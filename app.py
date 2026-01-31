@@ -295,9 +295,28 @@ if not df_real.empty:
             
             # Method 1: Try Info
             try:
+                # ---------------------------------------------------------
+                # CRITICAL: Strict Pre-market Time Window (04:00 - 09:30 ET)
+                # ---------------------------------------------------------
+                # Use pandas for reliable timezone conversion (requires pytz/dateutil which pandas has)
+                now_et = pd.Timestamp.now(tz='US/Eastern')
+                
+                # Create time objects for comparison
+                params_start = now_et.replace(hour=4, minute=0, second=0, microsecond=0)
+                params_end = now_et.replace(hour=9, minute=30, second=0, microsecond=0)
+                
+                # Check if strictly within the pre-market window
+                # Note: This logic assumes we only want to show it ON the same day during that window.
+                # Also ensure it is a weekday (Mon-Fri)
+                if now_et.dayofweek >= 5: # 5=Sat, 6=Sun
+                    return None
+
+                if not (params_start <= now_et < params_end):
+                    return None
+                
                 info = tick.info
                 
-                # CRITICAL: Hide pre-market data if Market is OPEN (REGULAR)
+                # Also check marketState if available (double check)
                 market_state = info.get('marketState', '').upper()
                 if market_state == "REGULAR":
                     return None
@@ -305,7 +324,8 @@ if not df_real.empty:
                 pm_price = info.get('preMarketPrice', None)
                 if pm_price is not None:
                     return float(pm_price)
-            except:
+            except Exception as e:
+                # print(f"Error checking pre-market: {e}")
                 pass
             
             # Method 2: Try History (Fallback)
