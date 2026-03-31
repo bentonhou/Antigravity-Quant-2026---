@@ -1,0 +1,82 @@
+/* Standards/fonts and UI/ui_styles.css */
+/* 全域設定 */
+.stApp, .stAppHeader {
+    background-color: #3B3B3B !important;
+    font-family: 'Myriad Pro', 'Microsoft JhengHei', sans-serif !important;
+}
+
+h1 {
+    font-size: 28px !important;
+    font-weight: bold !important;
+    color: #263248 !important;
+}
+
+h2 {
+    font-size: 22px !important;
+    font-weight: bold !important;
+    color: #7E8AA2 !important;
+}
+
+/* 隱藏預設元件 */
+div[data-testid="stSidebar"] > div:nth-child(2) { display: none !important; }
+.stSidebar > div:nth-child(2) { display: none !important; }
+div[class^="stSidebar"] > div[class^="resize-tr"] { display: none !important; }
+[data-testid="stElementToolbar"] { display: none; }
+
+/* 指標卡片設定 */
+.metric-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+    justify-content: space-between;
+}
+
+.metric-card {
+    flex: 1 1 140px;
+    background-color: #636363 !important; /* 卡片框底色 */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.metric-card:hover {
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.metric-label {
+    color: #FF9800 !important; /* 小標題 */
+    font-size: 16px !important;
+    font-weight: normal !important;
+    margin-bottom: 4px;
+}
+
+.metric-value {
+    color: #ffffff !important; /* 主數字 */
+    font-size: 36px !important;
+    font-weight: bold !important;
+    line-height: 1.2;
+}
+
+.metric-sub {
+    color: #B5B5B5 !important; /* 副標題 */
+    font-size: 14px !important;
+    font-weight: normal !important;
+    margin-top: 4px;
+}
+
+.pre-market-text {
+    color: #80CF59 !important; /* 盤前標籤 */
+    font-size: 16px !important;
+    font-weight: bold !important;
+    margin-left: 5px;
+}
+
+.signal-value {
+    font-size: 20px !important;
+    font-weight: bold !important;
+    color: #ffffff !important;
+}

@@ -5,8 +5,14 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import time
 import numpy as np
+import sys
+import os
 
-# --- Configuration ---
+# --- 設定字體與 UI 規範 ---
+ui_path = os.path.abspath(os.path.join("Standards", "fonts and UI"))
+if ui_path not in sys.path:
+    sys.path.append(ui_path)
+import ui_config# --- Configuration ---
 STOCKS_CONFIG = {
     "TSM":  {"start": 319.61, "target": 400.0},
     "NVDA": {"start": 187.20, "target": 265.0},
@@ -25,25 +31,15 @@ END_DATE = datetime(2026, 12, 31)
 TOTAL_DAYS = (END_DATE - START_DATE).days + 1
 
 st.set_page_config(page_title="Antigravity Quant 2026", layout="wide")
-st.markdown("<h1 style='font-size: 30px;'>Antigravity Quant 2026 - 波段導航儀</h1>", unsafe_allow_html=True)
-st.markdown("""
-<style>
-    /* Hide the drag handle for the sidebar - Multiple selectors for robustness */
-    div[data-testid="stSidebar"] > div:nth-child(2) {
-        display: none !important;
-    }
-    .stSidebar > div:nth-child(2) {
-        display: none !important;
-    }
-    div[class^="stSidebar"] > div[class^="resize-tr"] {
-        display: none !important;
-    }
-    /* Hide Streamlit element toolbar (fullscreen button) */
-    [data-testid="stElementToolbar"] {
-        display: none;
-    }
-</style>
-""", unsafe_allow_html=True)
+
+# 載入外部的 CSS 樣式
+def load_css(file_name):
+    with open(file_name, "r", encoding="utf-8") as f:
+        st.markdown(f"<style>\n{f.read()}\n</style>", unsafe_allow_html=True)
+
+load_css(os.path.join(ui_path, "ui_styles.css"))
+
+st.markdown("<h1>Antigravity Quant 2026 - 波段導航儀</h1>", unsafe_allow_html=True)
 
 # --- Sidebar Global Settings (Placed early for data dependency) ---
 st.sidebar.header("參數調整(目標價校正)")
@@ -200,7 +196,7 @@ df_adj["Lower_10"] = df_adj["Baseline"] * 0.90
 
 
 # --- Main Logic ---
-st.markdown(f"<h2 style='font-size: 24px; margin-top: 5px; margin-bottom: 15px;'>{selected_ticker} Wave Navigator</h2>", unsafe_allow_html=True)
+st.markdown(f"<h2>{selected_ticker} Wave Navigator</h2>", unsafe_allow_html=True)
 
 # Re-fetch specific ticker to ensure we have full history for plotting
 with st.spinner(f"Loading chart for {selected_ticker}..."):
@@ -354,63 +350,20 @@ if not df_real.empty:
         pm_dev_str = ""
         
         if pre_market_price:
-            pm_price_str = f'<span style="color: #00ff00; font-size: 0.8em; margin-left: 5px;">(Pre: ${pre_market_price:.2f})</span>'
+            pm_price_str = f'<span class="pre-market-text">(Pre: ${pre_market_price:.2f})</span>'
             
             # Calculate Deviation for Pre-market
             # Using same baseline as current day (valid approximation for pre-market of same day)
             if curr_baseline_val > 0:
                 pm_delta = pre_market_price - curr_baseline_val
                 pm_pct = (pm_delta / curr_baseline_val) * 100
-                pm_dev_str = f'<span style="color: #00ff00; font-size: 0.8em; margin-left: 5px;">(Pre: {pm_pct:+.2f}%)</span>'
+                pm_dev_str = f'<span class="pre-market-text">(Pre: {pm_pct:+.2f}%)</span>'
 
         # Container for Metrics
         chart_space = st.empty()
         
         with chart_space.container():
             st.markdown(textwrap.dedent(f"""
-    <style>
-    .metric-container {{
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-bottom: 20px;
-        justify-content: space-between;
-    }}
-                .metric-card {{
-                    flex: 1 1 140px;
-                    background-color: #1e1e1e;
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    border-radius: 8px;
-                    padding: 10px;
-                    text-align: center;
-                    transition: all 0.3s ease;
-                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-                }}
-                .metric-card:hover {{
-                    border-color: rgba(255, 255, 255, 0.3);
-                }}
-    .metric-label {{
-        color: #aaaaaa;
-        font-size: clamp(0.7rem, 2vw, 0.9rem);
-        margin-bottom: 4px;
-    }}
-    .metric-value {{
-        color: #ffffff;
-        font-size: clamp(1.1rem, 4vw, 1.8rem);
-        font-weight: 600;
-        line-height: 1.2;
-    }}
-    .metric-sub {{
-        color: #666666;
-        font-size: clamp(0.6rem, 1.5vw, 0.75rem);
-        margin-top: 4px;
-    }}
-    .signal-value {{
-        font-size: clamp(0.9rem, 3vw, 1.4rem);
-        font-weight: bold;
-        color: #ffffff;
-    }}
-    </style>
     <div class="metric-container">
     <div class="metric-card">
     <div class="metric-label">Current Price</div>
@@ -419,18 +372,18 @@ if not df_real.empty:
     </div>
     <div class="metric-card">
     <div class="metric-label">Adj Target</div>
-    <div class="metric-value" style="color: #cccccc;">${curr_baseline_val:.2f}</div>
+    <div class="metric-value">${curr_baseline_val:.2f}</div>
     <div class="metric-sub">Base: ${baseline_prices_base[day_diff]:.2f} (x{sentiment_factor})</div>
     </div>
     <div class="metric-card">
     <div class="metric-label">Deviation</div>
-    <div class="metric-value" style="color: #ffffff;">{delta_pct:+.2f}%{pm_dev_str}</div>
+    <div class="metric-value">{delta_pct:+.2f}%{pm_dev_str}</div>
     <div class="metric-sub">from Adj Base</div>
     </div>
     <div class="metric-card" style="{current_card_style}">
-    <div class="metric-label" style="color: #ffffff;">Signal</div>
+    <div class="metric-label" style="color: #ffffff !important;">Signal</div>
     <div class="signal-value">{signal_status.split(' ')[0]}</div>
-    <div class="metric-sub" style="color: #ffffff; opacity: 0.8;">{signal_status.split(' ', 1)[1] if ' ' in signal_status else ''}</div>
+    <div class="metric-sub" style="color: #ffffff !important;">{signal_status.split(' ', 1)[1] if ' ' in signal_status else ''}</div>
     </div>
     </div>
     """), unsafe_allow_html=True)
@@ -531,19 +484,23 @@ y_margin = (y_max_val - y_min_val) * 0.05
 fig.update_layout(
     height=600, 
     hovermode="x unified",
+    **ui_config.PLOTLY_LAYOUT,
     legend=dict(
         orientation="h",
         yanchor="bottom",
         y=1.02,
         xanchor="right",
-        x=1
+        x=1,
+        **ui_config.PLOTLY_LAYOUT.get("legend", {})
     ),
     yaxis=dict(
         range=[y_min_val - y_margin, y_max_val + y_margin],
-        fixedrange=True # Disable zoom on Y
+        fixedrange=True, # Disable zoom on Y
+        **ui_config.PLOTLY_AXES
     ),
     xaxis=dict(
-        fixedrange=True # Disable zoom on X
+        fixedrange=True, # Disable zoom on X
+        **ui_config.PLOTLY_AXES
     )
 )
 
@@ -554,6 +511,7 @@ fig.update_layout(
 with st.container(border=True):
     st.plotly_chart(
         fig, 
+        theme=None,
         use_container_width=True,
         config={
             'displayModeBar': True,
