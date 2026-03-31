@@ -200,6 +200,8 @@ df_adj["Lower_10"] = df_adj["Baseline"] * 0.90
 
 
 # --- Main Logic ---
+st.markdown(f"<h2 style='font-size: 24px; margin-top: 5px; margin-bottom: 15px;'>{selected_ticker} Wave Navigator</h2>", unsafe_allow_html=True)
+
 # Re-fetch specific ticker to ensure we have full history for plotting
 with st.spinner(f"Loading chart for {selected_ticker}..."):
     df_real = get_stock_data(selected_ticker)
@@ -527,7 +529,6 @@ y_min_val = min(y_min_candidates)
 y_margin = (y_max_val - y_min_val) * 0.05
 
 fig.update_layout(
-    title=f"{selected_ticker} Wave Navigator", 
     height=600, 
     hovermode="x unified",
     legend=dict(
