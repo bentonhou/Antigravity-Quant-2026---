@@ -7,8 +7,15 @@
 }
 
 html, body, .stApp, .main, [data-testid="stAppViewContainer"], 
-p, span, h1, h2, h3, h4, h5, h6, li, label, div[data-testid="stMarkdownContainer"] {
+p, h1, h2, h3, h4, h5, h6, li, label, div[data-testid="stMarkdownContainer"],
+div[data-testid="stMarkdownContainer"] span {
     font-family: 'Myriad Pro', 'Microsoft JhengHei', sans-serif !important;
+}
+
+/* 確保 Header 左側收合鈕內的 Material Ligature 文字 (chevron_right 等) 正常渲染為圖示 */
+[data-testid="stHeader"] [data-testid="collapsedControl"] span,
+[data-testid="stSidebarCollapsedControl"] span {
+    font-family: 'Material Symbols Rounded' !important;
 }
 
 html, body, .stApp, .main, [data-testid="stAppViewContainer"] {
