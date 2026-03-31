@@ -481,28 +481,33 @@ y_max_val = max(y_max_candidates)
 y_min_val = min(y_min_candidates)
 y_margin = (y_max_val - y_min_val) * 0.05
 
-fig.update_layout(
-    height=600, 
-    hovermode="x unified",
-    **ui_config.PLOTLY_LAYOUT,
-    legend=dict(
-        orientation="h",
-        yanchor="bottom",
-        y=1.02,
-        xanchor="right",
-        x=1,
-        **ui_config.PLOTLY_LAYOUT.get("legend", {})
-    ),
-    yaxis=dict(
+# 準備合併圖表設定
+merged_legend = dict(ui_config.PLOTLY_LAYOUT.get("legend", {}))
+merged_legend.update({
+    "orientation": "h",
+    "yanchor": "bottom",
+    "y": 1.02,
+    "xanchor": "right",
+    "x": 1
+})
+
+layout_kwargs = dict(ui_config.PLOTLY_LAYOUT)
+layout_kwargs.update({
+    "height": 600,
+    "hovermode": "x unified",
+    "legend": merged_legend,
+    "yaxis": dict(
         range=[y_min_val - y_margin, y_max_val + y_margin],
         fixedrange=True, # Disable zoom on Y
         **ui_config.PLOTLY_AXES
     ),
-    xaxis=dict(
+    "xaxis": dict(
         fixedrange=True, # Disable zoom on X
         **ui_config.PLOTLY_AXES
     )
-)
+})
+
+fig.update_layout(**layout_kwargs)
 
 # RENDER CHART IN CONTAINER
 # If chart_space was defined earlier (inside the if), use it. But fig creation is outside.
