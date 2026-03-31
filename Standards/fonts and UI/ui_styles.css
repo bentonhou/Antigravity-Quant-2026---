@@ -6,7 +6,8 @@
     --font: 'Myriad Pro', 'Microsoft JhengHei', sans-serif !important;
 }
 
-html, body, [class*="css"], [class*="st-"] {
+html, body, .stApp, .main, [data-testid="stAppViewContainer"], 
+p, span, h1, h2, h3, h4, h5, h6, li, label, div[data-testid="stMarkdownContainer"] {
     font-family: 'Myriad Pro', 'Microsoft JhengHei', sans-serif !important;
 }
 
@@ -160,61 +161,6 @@ div[class^="stSidebar"] > div[class^="resize-tr"] { display: none !important; }
     font-family: 'Material Symbols Rounded' !important;
 }
 
-/* 2. 側邊欄開關（展開/收合）：替換 SVG 漢堡按鈕，徹底消滅跑位的亂碼字串 */
-
-/* 將長長的破圖字串，透過強制掛回系統圖示字型，讓它縮成一個小圖示，再完全透明化隱藏它 */
-[data-testid="stSidebarCollapsedControl"] *,
-[aria-label="Expand sidebar"] *,
-button[title*="sidebar" i] *,
-[data-testid="stSidebarCollapseButton"] * {
-    font-family: 'Material Symbols Rounded' !important;
-    opacity: 0 !important; 
-    color: transparent !important;
-    fill: transparent !important;
-}
-
-/* 隱藏外層多餘空隙並開啟相對定位，讓漢堡有地方貼 */
-[data-testid="stSidebarCollapsedControl"],
-[aria-label="Expand sidebar"],
-button[title*="sidebar" i],
-[data-testid="stSidebarCollapseButton"] {
-    position: relative !important;
-    color: transparent !important;
-    font-size: 0 !important;
-}
-
-/* 將 SVG 漢堡圖案絕對定位在透明按鈕的正中央 */
-[data-testid="stSidebarCollapsedControl"]::before,
-[aria-label="Expand sidebar"]::before,
-button[title*="sidebar" i]::before,
-[data-testid="stSidebarCollapseButton"]::before {
-    content: "";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 24px;
-    height: 24px;
-    background-color: #B5B5B5;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z'/%3E%3C/svg%3E") no-repeat center / contain;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z'/%3E%3C/svg%3E") no-repeat center / contain;
-    transition: background-color 0.2s ease;
-    pointer-events: none; /* 滑鼠點擊會穿透它，精準觸發背後的隱形按鈕 */
-}
-
-/* 滑鼠 Hover 時高亮為主題橘色 */
-[data-testid="stSidebarCollapsedControl"]:hover::before,
-[aria-label="Expand sidebar"]:hover::before,
-button[title*="sidebar" i]:hover::before,
-[data-testid="stSidebarCollapseButton"]:hover::before {
-    background-color: #FF9800 !important;
-}
-
-/* 隱藏右上角的 Streamlit 預設開發者工具列 (Deploy, Record, Menu 等) */
-[data-testid="stToolbar"] {
-    visibility: hidden !important;
-    display: none !important;
-}
 
 /* 隱藏最底部的 Streamlit 浮水印 (若有需要) */
 footer {
