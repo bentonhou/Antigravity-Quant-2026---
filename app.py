@@ -42,11 +42,13 @@ load_css(os.path.join(ui_path, "ui_styles.css"))
 st.markdown("<h1>Antigravity Quant 2026 - 波段導航儀</h1>", unsafe_allow_html=True)
 
 # --- Sidebar Global Settings (Placed early for data dependency) ---
-st.sidebar.header("參數調整(目標價校正)")
+st.sidebar.markdown("<h1>參數調整(目標價校正)</h1>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2>Market Sentiment</h2>", unsafe_allow_html=True)
 sentiment_label = st.sidebar.select_slider(
     "Market Sentiment",
     options=["Optimistic (1.05)", "Base Target (1.00)", "Conservative (0.90)"],
-    value="Base Target (1.00)"
+    value="Base Target (1.00)",
+    label_visibility="collapsed"
 )
 sentiment_mapping = {
     "Optimistic (1.05)": 1.05,
@@ -78,7 +80,7 @@ def calculate_status(ticker, price, date_obj, sentiment=1.0):
     # Baseline for date
     day_diff = (date_obj - START_DATE).days
     
-    status_icon = "⚪" # Default
+    status_icon = ":gray[●]" # Default
     
     if 0 <= day_diff < TOTAL_DAYS:
         curr_baseline = p_start + slope * day_diff
@@ -87,11 +89,11 @@ def calculate_status(ticker, price, date_obj, sentiment=1.0):
         lower_bound = curr_baseline * 0.90
         
         if price <= lower_bound:
-            status_icon = "🟢"
+            status_icon = ":green[●]"
         elif price >= upper_bound_2:
-            status_icon = "🔴"
+            status_icon = ":red[●]"
         elif price >= upper_bound_1:
-            status_icon = "🟡"
+            status_icon = ":orange[●]"
             
     return status_icon
 
@@ -126,7 +128,7 @@ with st.spinner("Updating Market Signals..."):
     df_all = get_stock_data(" ".join(all_tickers_list))
 
 for ticker in all_tickers_list:
-    icon = "⚪"
+    icon = ":gray[●]"
     trend = ""
     try:
         # Handle MultiIndex or Single ticker return structure
@@ -154,17 +156,17 @@ for ticker in all_tickers_list:
     except Exception as e:
         pass 
     
-    label = f"{ticker} {icon}"
+    label = f"*{ticker}* {icon}"
     if trend and trend != "ERROR":
         label += f" {trend}"
     
     sidebar_options[label] = ticker
 
 # --- Sidebar ---
-st.sidebar.header("Asset Selection")
+st.sidebar.markdown("<h2>Asset Selection</h2>", unsafe_allow_html=True)
 # Create reverse mapping or just use keys
 display_keys = list(sidebar_options.keys())
-selected_display = st.sidebar.radio("Ticker", display_keys)
+selected_display = st.sidebar.radio("Ticker", display_keys, label_visibility="collapsed")
 selected_ticker = sidebar_options[selected_display]
 
 auto_refresh = st.sidebar.checkbox("Auto-Refresh (60s)", value=True)
@@ -250,16 +252,16 @@ if not df_real.empty:
         delta_pct = (delta / curr_baseline_val) * 100
         
         if current_price <= lower_bound_val:
-            signal_status = "🟢 觸發『買入點 a』 (Buy!)"
+            signal_status = "觸發『買入點 a』 (Buy!)"
             signal_type = "buy"
         elif current_price >= upper_bound_2_val:
-            signal_status = "🔴 觸發『第二階段全賣』 (Exit B - Sell Remaining 50%)"
+            signal_status = "觸發『第二階段全賣』 (Exit B - Sell Remaining 50%)"
             signal_type = "reduce_2"
         elif current_price >= upper_bound_1_val:
-            signal_status = "🟡 觸發『第一階段減碼』 (Sell 50%)"
+            signal_status = "觸發『第一階段減碼』 (sell 50%)"
             signal_type = "reduce_1"
         else:
-            signal_status = "⚪ 觀望 / 持有 (Hold)"
+            signal_status = "觀望 / 持有 (Hold)"
             signal_type = "neutral"
             
         trend_arrow = calculate_trend(df_plot['Close_Flat'])
@@ -382,8 +384,10 @@ if not df_real.empty:
     </div>
     <div class="metric-card" style="{current_card_style}">
     <div class="metric-label" style="color: #ffffff !important;">Signal</div>
-    <div class="signal-value">{signal_status.split(' ')[0]}</div>
-    <div class="metric-sub" style="color: #ffffff !important;">{signal_status.split(' ', 1)[1] if ' ' in signal_status else ''}</div>
+    <div class="signal-value" style="display: flex; justify-content: center; align-items: center; min-height: 43px;">
+        <span style="display: inline-block; width: 36px; height: 36px; border-radius: 50%; background-color: {main_color};"></span>
+    </div>
+    <div class="metric-sub" style="color: #ffffff !important;">{signal_status}</div>
     </div>
     </div>
     """), unsafe_allow_html=True)
@@ -513,7 +517,7 @@ fig.update_layout(**layout_kwargs)
 # If chart_space was defined earlier (inside the if), use it. But fig creation is outside.
 # Let's clean up structure. 
 # We'll use a main_block container for everything below header.
-with st.container(border=True):
+with st.container(border=False):
     st.plotly_chart(
         fig, 
         theme=None,
@@ -526,7 +530,7 @@ with st.container(border=True):
         }
     )
 
-st.markdown("---")
+# st.markdown("---") # Removed per user request
 st.markdown(f"**Update Status:** Fetched at {datetime.now().strftime('%H:%M:%S')}")
 
 # --- Auto Refresh ---

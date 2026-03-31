@@ -2,8 +2,8 @@
 
 # Plotly 全域圖表設定
 PLOTLY_LAYOUT = {
-    "paper_bgcolor": "#636363", # 圖表框底色
-    "plot_bgcolor": "#636363",  # 圖表內底色
+    "paper_bgcolor": "#18181b", # 圖表框底色
+    "plot_bgcolor": "#18181b",  # 圖表內底色
     "font": {
         "family": "'Myriad Pro', 'Microsoft JhengHei', sans-serif"
     },
