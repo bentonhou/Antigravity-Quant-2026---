@@ -227,16 +227,33 @@ if not df_real.empty:
         y_data_series = df_real['Close']
 
     df_plot = df_real.copy()
+    
+    # Ensure columns are single-level strings (flatten MultiIndex if necessary)
+    if isinstance(df_plot.columns, pd.MultiIndex):
+        df_plot.columns = [col[0] if col[1] == '' else f"{col[0]}_{col[1]}" for col in df_plot.columns]
+    
     df_plot['Close_Flat'] = y_data_series
     df_plot = df_plot.reset_index()
 
-    last_row = df_plot.iloc[-1]
-    last_date = pd.to_datetime(last_row['Date'])
-    if isinstance(last_date, pd.Series):
-        last_date = last_date.iloc[0]
+    # Find the last row with a valid price to avoid TypeError during float conversion
+    # Safely check if Close_Flat exists, though it should be there now
+    subset_col = 'Close_Flat' if 'Close_Flat' in df_plot.columns else df_plot.columns[-1]
+    df_valid = df_plot.dropna(subset=[subset_col])
+    if not df_valid.empty:
+        last_row = df_valid.iloc[-1]
+        last_date = pd.to_datetime(last_row['Date'])
+        if isinstance(last_date, pd.Series):
+            last_date = last_date.iloc[0]
+        
+        current_price = float(last_row['Close_Flat'])
+    else:
+        # Fallback if no valid price data exists
+        last_row = df_plot.iloc[-1]
+        last_date = pd.to_datetime(last_row['Date'])
+        if isinstance(last_date, pd.Series):
+            last_date = last_date.iloc[0]
+        current_price = 0.0
 
-    current_price = float(last_row['Close_Flat'])
-    
     if hasattr(last_date, 'date'):
         day_diff = (last_date - START_DATE).days
     else:
@@ -249,7 +266,7 @@ if not df_real.empty:
         lower_bound_val = curr_baseline_val * 0.90
         
         delta = current_price - curr_baseline_val
-        delta_pct = (delta / curr_baseline_val) * 100
+        delta_pct = (delta / curr_baseline_val) * 100 if curr_baseline_val != 0 else 0.0
         
         if current_price <= lower_bound_val:
             signal_status = "觸發『買入點 a』 (Buy!)"
