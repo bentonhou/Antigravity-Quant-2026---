@@ -305,58 +305,146 @@ if not df_real.empty:
         }
         main_color = color_map.get(signal_type, "#e0e0e0")
 
-        # Helper to safely get pre-market data
-        def get_premarket_info(ticker):
-            # ---------------------------------------------------------
-            # CRITICAL: Strict Pre-market Time Window (04:00 - 09:30 ET)
-            # ---------------------------------------------------------
-            try:
-                now_et = pd.Timestamp.now(tz='US/Eastern')
-                if now_et.dayofweek >= 5: # 5=Sat, 6=Sun
-                    return None
-
-                params_start = now_et.replace(hour=4, minute=0, second=0, microsecond=0)
-                params_end = now_et.replace(hour=9, minute=30, second=0, microsecond=0)
-
-                if not (params_start <= now_et < params_end):
-                    return None
-            except:
-                return None
-
-            pm_price = None
-            tick = yf.Ticker(ticker)
-            
-            # Method 1: Try Info
-            try:
-                info = tick.info
-                # Also check marketState if available
-                market_state = info.get('marketState', '').upper()
-                if market_state == "REGULAR":
-                    return None
-                    
-                pm_price = info.get('preMarketPrice', None)
-                if pm_price is not None:
-                    return float(pm_price)
-            except:
-                pass
-            
-            # Method 2: Try History (Fallback)
-            try:
-
-                # Fallback to history if info failed or returned None
-                tick_history_period = '1d'
-                # If it's early Monday morning, we might need more history to find Friday's close? 
-                # '1d' usually covers the last trading session if market is closed.
-                
-                df_h = tick.history(period='5d', interval='1m', prepost=True)
-                if not df_h.empty:
-                    # Get the very last available price
-                    last_price = float(df_h['Close'].iloc[-1])
-                    return last_price
-            except:
-                pass
-                
+# --- Helper: Pre-market Logic (Moved to Top Level with Caching) ---
+@st.cache_data(ttl=30)
+def get_premarket_info(ticker):
+    # ---------------------------------------------------------
+    # CRITICAL: Strict Pre-market Time Window (04:00 - 09:30 ET)
+    # ---------------------------------------------------------
+    try:
+        now_et = pd.Timestamp.now(tz='US/Eastern')
+        if now_et.dayofweek >= 5: # 5=Sat, 6=Sun
             return None
+
+        params_start = now_et.replace(hour=4, minute=0, second=0, microsecond=0)
+        params_end = now_et.replace(hour=9, minute=30, second=0, microsecond=0)
+
+        if not (params_start <= now_et < params_end):
+            return None
+    except:
+        return None
+
+    pm_price = None
+    tick = yf.Ticker(ticker)
+    
+    # Method 1: Try Info (Multiple potential keys)
+    try:
+        info = tick.info
+        # Try specific pre-market keys first
+        for key in ['preMarketPrice', 'ask', 'bid']:
+            val = info.get(key)
+            if val is not None and val > 0:
+                return float(val)
+    except:
+        pass
+    
+    # Method 2: Try History (Very fast 1d/1m fetch)
+    try:
+        df_h = tick.history(period='1d', interval='1m', prepost=True)
+        if not df_h.empty:
+            return float(df_h['Close'].iloc[-1])
+    except:
+        pass
+        
+    return None
+
+# --- Main Logic ---
+st.markdown(f"<h2>{selected_ticker} Wave Navigator</h2>", unsafe_allow_html=True)
+
+# Re-fetch specific ticker to ensure we have full history for plotting
+with st.spinner(f"Loading chart for {selected_ticker}..."):
+    df_real = get_stock_data(selected_ticker)
+
+# --- Signal Logic & Metrics ---
+current_price = 0.0
+signal_status = "Waiting for data..."
+signal_type = "neutral" # neutral, buy, reduce_1, reduce_2
+
+# Use ADJUSTED values for Logic/Metrics
+curr_baseline_val = 0
+lower_bound_val = 0
+upper_bound_1_val = 0
+upper_bound_2_val = 0
+delta_pct = 0.0
+
+if not df_real.empty:
+    # Flatten MultiIndex if necessary for consistent extraction
+    if isinstance(df_real.columns, pd.MultiIndex):
+        try:
+             y_data_series = df_real['Close'].iloc[:, 0]
+        except:
+             y_data_series = df_real.iloc[:, 0]
+    else:
+        y_data_series = df_real['Close']
+
+    df_plot = df_real.copy()
+    
+    # Ensure columns are single-level strings (flatten MultiIndex if necessary)
+    if isinstance(df_plot.columns, pd.MultiIndex):
+        df_plot.columns = [col[0] if col[1] == '' else f"{col[0]}_{col[1]}" for col in df_plot.columns]
+    
+    df_plot['Close_Flat'] = y_data_series
+    df_plot = df_plot.reset_index()
+
+    # Find the last row with a valid price to avoid TypeError during float conversion
+    subset_col = 'Close_Flat' if 'Close_Flat' in df_plot.columns else df_plot.columns[-1]
+    df_valid = df_plot.dropna(subset=[subset_col])
+    if not df_valid.empty:
+        last_row = df_valid.iloc[-1]
+        last_date = pd.to_datetime(last_row['Date'])
+        if isinstance(last_date, pd.Series):
+            last_date = last_date.iloc[0]
+        
+        current_price = float(last_row['Close_Flat'])
+    else:
+        # Fallback if no valid price data exists
+        last_row = df_plot.iloc[-1]
+        last_date = pd.to_datetime(last_row['Date'])
+        if isinstance(last_date, pd.Series):
+            last_date = last_date.iloc[0]
+        current_price = 0.0
+
+    if hasattr(last_date, 'date'):
+        day_diff = (last_date - START_DATE).days
+    else:
+        day_diff = (pd.to_datetime(last_date) - START_DATE).days
+    
+    if 0 <= day_diff < TOTAL_DAYS:
+        curr_baseline_val = baseline_prices_adj[day_diff]
+        upper_bound_1_val = curr_baseline_val * 1.25
+        upper_bound_2_val = curr_baseline_val * 1.375
+        lower_bound_val = curr_baseline_val * 0.90
+        
+        delta = current_price - curr_baseline_val
+        delta_pct = (delta / curr_baseline_val) * 100 if curr_baseline_val != 0 else 0.0
+        
+        if current_price <= lower_bound_val:
+            signal_status = "觸發『買入點 a』 (Buy!)"
+            signal_type = "buy"
+        elif current_price >= upper_bound_2_val:
+            signal_status = "觸發『第二階段全賣』 (Exit B - Sell Remaining 50%)"
+            signal_type = "reduce_2"
+        elif current_price >= upper_bound_1_val:
+            signal_status = "觸發『第一階段減碼』 (sell 50%)"
+            signal_type = "reduce_1"
+        else:
+            signal_status = "觀望 / 持有 (Hold)"
+            signal_type = "neutral"
+            
+        trend_arrow = calculate_trend(df_plot['Close_Flat'])
+        if trend_arrow != "ERROR":
+            signal_status += f" {trend_arrow}"
+            
+        import textwrap
+        current_card_style = card_styles.get(signal_type, card_styles["neutral"])
+        
+        color_map = {
+            "buy": "#00ff00",
+            "reduce_1": "#ffcc00",
+            "reduce_2": "#ff4444",
+            "neutral": "#e0e0e0"
+        }
+        main_color = color_map.get(signal_type, "#e0e0e0")
 
         pre_market_price = get_premarket_info(selected_ticker)
         
@@ -368,7 +456,6 @@ if not df_real.empty:
             pm_price_str = f'<span class="pre-market-text">(Pre: ${pre_market_price:.2f})</span>'
             
             # Calculate Deviation for Pre-market
-            # Using same baseline as current day (valid approximation for pre-market of same day)
             if curr_baseline_val > 0:
                 pm_delta = pre_market_price - curr_baseline_val
                 pm_pct = (pm_delta / curr_baseline_val) * 100
@@ -453,33 +540,37 @@ if not df_plot.empty:
 
 # Add Pre-market Point if available
 if pre_market_price:
-    # We need a date for the X-axis. 
-    # If df_plot has today, use it. If not, use last date + 1 or today's actual date.
-    target_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    # 1. Determine the target date (today's date in ET, aligned to 00:00:00 for the chart)
+    now_et = pd.Timestamp.now(tz='US/Eastern')
+    target_date = pd.to_datetime(now_et.date())
     
-    # 1. Add Marker (without text)
+    # 2. Add Marker (Increased size for visibility)
     fig.add_trace(go.Scatter(
         x=[target_date], 
         y=[pre_market_price], 
         mode='markers', 
         name='Pre-market',
-        marker=dict(color='#00ff00', size=4, symbol='circle'),
+        marker=dict(color='#00ff00', size=10, symbol='circle', line=dict(color='white', width=1)),
         showlegend=False
     ))
 
-    # 2. Add Connecting Line (from last close to pre-market)
+    # 3. Add Connecting Line (from last valid close to pre-market)
     if not df_plot.empty:
-        last_date_plot = df_plot["Date"].iloc[-1]
-        last_close_val = df_plot["Close_Flat"].iloc[-1]
-        
-        fig.add_trace(go.Scatter(
-            x=[last_date_plot, target_date],
-            y=[last_close_val, pre_market_price],
-            mode='lines',
-            name='Pre-market Link',
-            line=dict(color='#00ff00', width=4), # Green connecting line
-            showlegend=False
-        ))
+        # Find last row with valid data to connect from
+        df_valid_conn = df_plot.dropna(subset=['Close_Flat'])
+        if not df_valid_conn.empty:
+            last_valid_row = df_valid_conn.iloc[-1]
+            last_date_v = pd.to_datetime(last_valid_row['Date'])
+            last_price_v = float(last_valid_row['Close_Flat'])
+            
+            fig.add_trace(go.Scatter(
+                x=[last_date_v, target_date],
+                y=[last_price_v, pre_market_price],
+                mode='lines',
+                name='Pre-market Link',
+                line=dict(color='#00ff00', width=3, dash='dot'), # Dotted green link
+                showlegend=False
+            ))
 
 # --- Calculate Fixed Axis Range ---
 # Determine min/max across all relevant series to fix the view
