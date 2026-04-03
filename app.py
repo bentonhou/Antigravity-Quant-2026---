@@ -207,7 +207,23 @@ def get_premarket_info(ticker):
     # ---------------------------------------------------------
     try:
         now_et = pd.Timestamp.now(tz='US/Eastern')
-        if now_et.dayofweek >= 5: # 5=Sat, 6=Sun
+        current_date_str = now_et.strftime('%Y-%m-%d')
+        
+        # 2026 US Market Holidays (Market Closed)
+        holidays_2026 = [
+            '2026-01-01', # New Year
+            '2026-01-19', # MLK
+            '2026-02-16', # Washington
+            '2026-04-03', # Good Friday
+            '2026-05-25', # Memorial Day
+            '2026-06-19', # Juneteenth
+            '2026-07-03', # Independence (Observed)
+            '2026-09-07', # Labor Day
+            '2026-11-26', # Thanksgiving
+            '2026-12-25'  # Christmas
+        ]
+        
+        if now_et.dayofweek >= 5 or current_date_str in holidays_2026:
             return None
 
         params_start = now_et.replace(hour=4, minute=0, second=0, microsecond=0)
@@ -330,6 +346,13 @@ if not df_real.empty:
             signal_status += f" {trend_arrow}"
             
         import textwrap
+        # Color mapping for Signal Card
+        card_styles = {
+            "buy":      "background-color: rgba(0, 255, 0, 0.2); border: 1px solid #00ff00;",
+            "reduce_1": "background-color: rgba(255, 204, 0, 0.2); border: 1px solid #ffcc00;",
+            "reduce_2": "background-color: rgba(255, 68, 68, 0.2); border: 1px solid #ff4444;",
+            "neutral":  "background-color: #1e1e1e; border: 1px solid rgba(255, 255, 255, 0.1);"
+        }
         current_card_style = card_styles.get(signal_type, card_styles["neutral"])
         
         color_map = {
