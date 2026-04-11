@@ -14,16 +14,16 @@ if ui_path not in sys.path:
     sys.path.append(ui_path)
 import ui_config# --- Configuration ---
 STOCKS_CONFIG = {
-    "TSM":  {"start": 319.61, "target": 400.0},
-    "NVDA": {"start": 187.20, "target": 265.0},
-    "AMD":  {"start": 214.30, "target": 250.0},
-    "MSFT": {"start": 472.94, "target": 580.0},
-    "GOOG": {"start": 315.32, "target": 380.0},
-    "QCOM": {"start": 173.00, "target": 210.0},
-    "AMZN": {"start": 237.21, "target": 280.0},
-    "AVGO": {"start": 347.62, "target": 435.0},
-    "MRVL": {"start": 89.39,  "target": 125.0},
-    "NOK":  {"start": 6.51,   "target": 8.00},
+    "TSM":  {"start": 319.61, "target": 435.0},
+    "NVDA": {"start": 187.20, "target": 270.0},
+    "AMD":  {"start": 214.30, "target": 290.0},
+    "MSFT": {"start": 472.94, "target": 590.0},
+    "GOOG": {"start": 315.32, "target": 360.0},
+    "QCOM": {"start": 173.00, "target": 155.0},
+    "AMZN": {"start": 237.21, "target": 285.0},
+    "AVGO": {"start": 347.62, "target": 475.0},
+    "MRVL": {"start": 89.39,  "target": 123.0},
+    "NOK":  {"start": 6.51,   "target": 8.50},
 }
 
 START_DATE = datetime(2026, 1, 1)
@@ -200,62 +200,52 @@ df_adj["Lower_10"] = df_adj["Baseline"] * 0.90
 
 
 # --- Helper: Pre-market Logic (Moved to Top Level with Caching) ---
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=20)
 def get_premarket_info(ticker):
-    # ---------------------------------------------------------
-    # CRITICAL: Strict Pre-market Time Window (04:00 - 09:30 ET)
-    # ---------------------------------------------------------
+    """
+    獲取盤前價格。改用更穩定的 history 方式，並精準判斷盤前時段。
+    """
     try:
         now_et = pd.Timestamp.now(tz='US/Eastern')
         current_date_str = now_et.strftime('%Y-%m-%d')
         
-        # 2026 US Market Holidays (Market Closed)
+        # 2026 紐約股市休市清單
         holidays_2026 = [
-            '2026-01-01', # New Year
-            '2026-01-19', # MLK
-            '2026-02-16', # Washington
-            '2026-04-03', # Good Friday
-            '2026-05-25', # Memorial Day
-            '2026-06-19', # Juneteenth
-            '2026-07-03', # Independence (Observed)
-            '2026-09-07', # Labor Day
-            '2026-11-26', # Thanksgiving
-            '2026-12-25'  # Christmas
+            '2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03',
+            '2026-05-25', '2026-06-19', '2026-07-03', '2026-09-07',
+            '2026-11-26', '2026-12-25'
         ]
         
+        # 周末與休假日不顯示
         if now_et.dayofweek >= 5 or current_date_str in holidays_2026:
             return None
 
-        params_start = now_et.replace(hour=4, minute=0, second=0, microsecond=0)
-        params_end = now_et.replace(hour=9, minute=30, second=0, microsecond=0)
+        # 定義盤前時段：04:00 - 09:30 ET
+        pm_start = now_et.replace(hour=4, minute=0, second=0, microsecond=0)
+        pm_end = now_et.replace(hour=9, minute=30, second=0, microsecond=0)
 
-        if not (params_start <= now_et < params_end):
+        # 非盤前時段則返回 None
+        if not (pm_start <= now_et < pm_end):
             return None
-    except:
-        return None
-
-    pm_price = None
-    tick = yf.Ticker(ticker)
-    
-    # Method 1: Try Info (Multiple potential keys)
-    try:
-        info = tick.info
-        # Try specific pre-market keys first
-        for key in ['preMarketPrice', 'ask', 'bid']:
-            val = info.get(key)
-            if val is not None and val > 0:
-                return float(val)
-    except:
-        pass
-    
-    # Method 2: Try History (Very fast 1d/1m fetch)
-    try:
-        df_h = tick.history(period='1d', interval='1m', prepost=True)
-        if not df_h.empty:
-            return float(df_h['Close'].iloc[-1])
-    except:
-        pass
+            
+        # 獲取最新資料 (只抓最近 1 天的 1 分鐘線，包含盤前)
+        t = yf.Ticker(ticker)
+        df_h = t.history(period='1d', interval='1m', prepost=True)
         
+        if not df_h.empty:
+            # 取得最後一個價格點
+            last_ts = df_h.index[-1].tz_convert('US/Eastern')
+            # 確保抓到的點確實是「今天」的盤前點（避免抓到昨天的盤後或收盤）
+            if last_ts.date() == now_et.date():
+                return float(df_h['Close'].iloc[-1])
+                
+        # 備援：嘗試 info 中的 preMarketPrice (雖然較慢且不穩定)
+        # info = t.info
+        # val = info.get('preMarketPrice') or info.get('ask') or info.get('bid')
+        # if val and val > 0: return float(val)
+
+    except Exception:
+        pass
     return None
 
 # --- Main Logic ---
