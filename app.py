@@ -77,10 +77,14 @@ def calculate_status(ticker, price, date_obj, sentiment=1.0):
     p_target = config["target"] * sentiment # Apply Sentiment Adjustment
     slope = (p_target - p_start) / (TOTAL_DAYS - 1)
     
-    # Baseline for date
-    day_diff = (date_obj - START_DATE).days
+    # 確保日期對象為 naive (移除時區)，以便進行計算
+    if hasattr(date_obj, 'tzinfo') and date_obj.tzinfo is not None:
+        date_obj = date_obj.replace(tzinfo=None)
     
     status_icon = ":gray[●]" # Default
+    
+    # Baseline for date
+    day_diff = (date_obj - START_DATE).days
     
     if 0 <= day_diff < TOTAL_DAYS:
         curr_baseline = p_start + slope * day_diff
@@ -127,9 +131,9 @@ sidebar_options = {}
 with st.spinner("Updating Market Signals..."):
     # 1. 抓取日線歷史數據
     df_all = get_stock_data(" ".join(all_tickers_list))
-    # 2. 抓取所有 Ticker 的最新分時數據 (含盤前盤後) 以更新小圓點狀態
+    # 2. 抓取所有 Ticker 的最新分時數據 (含盤前盤後) - 使用 5d 確保能抓到最近的資料
     try:
-        df_ext_all = yf.download(" ".join(all_tickers_list), period='1d', interval='5m', prepost=True, progress=False)
+        df_ext_all = yf.download(" ".join(all_tickers_list), period='5d', interval='15m', prepost=True, progress=False)
     except:
         df_ext_all = pd.DataFrame()
 
@@ -141,40 +145,52 @@ for ticker in all_tickers_list:
         final_price = None
         final_date = None
         
-        # 先從日線找
-        if isinstance(df_all.columns, pd.MultiIndex):
-            if ticker in df_all['Close'].columns:
-                series = df_all['Close'][ticker].dropna()
-                if not series.empty:
-                    final_price = float(series.iloc[-1])
-                    final_date = pd.to_datetime(series.index[-1])
-                    trend = calculate_trend(series)
-        else:
-             if len(all_tickers_list) == 1 and all_tickers_list[0] == ticker:
-                series = df_all['Close'].dropna() if 'Close' in df_all else df_all.iloc[:,0].dropna()
-                if not series.empty:
-                    final_price = float(series.iloc[-1])
-                    final_date = pd.to_datetime(series.index[-1])
-                    trend = calculate_trend(series)
+        # Helper 提取最新值
+        def get_series_last(df, attr, tk):
+            try:
+                if isinstance(df.columns, pd.MultiIndex):
+                    if attr in df.columns.levels[0] and tk in df[attr].columns:
+                        s = df[attr][tk].dropna()
+                        if not s.empty:
+                            return float(s.iloc[-1]), pd.to_datetime(s.index[-1])
+                elif attr in df.columns: # Single ticker structure
+                    s = df[attr].dropna()
+                    if not s.empty:
+                        return float(s.iloc[-1]), pd.to_datetime(s.index[-1])
+            except: pass
+            return None, None
 
-        # 再從擴展時段數據找 (若有更晚的數據則覆寫)
-        if not df_ext_all.empty:
-            if isinstance(df_ext_all.columns, pd.MultiIndex):
-                if ticker in df_ext_all['Close'].columns:
-                    ext_series = df_ext_all['Close'][ticker].dropna()
-                    if not ext_series.empty:
-                        ext_price = float(ext_series.iloc[-1])
-                        ext_time = pd.to_datetime(ext_series.index[-1]).tz_convert('US/Eastern')
-                        # 如果擴展時段日期與日線最後日期一致或更晚，則使用擴展價格
-                        if final_date is None or ext_time.date() >= final_date.date():
-                            final_price = ext_price
-                            final_date = ext_time
+        # 先從日線提取
+        p_day, d_day = get_series_last(df_all, 'Close', ticker)
+        if p_day is not None:
+            final_price = p_day
+            final_date = d_day
+            # 計算趨勢 (僅用日線)
+            try:
+                if isinstance(df_all.columns, pd.MultiIndex):
+                    trend = calculate_trend(df_all['Close'][ticker].dropna())
+                else:
+                    trend = calculate_trend(df_all['Close'].dropna())
+            except: pass
+
+        # 再從擴展時段數據提取 (若有更晚的數據則覆寫)
+        p_ext, d_ext = get_series_last(df_ext_all, 'Close', ticker)
+        if p_ext is not None:
+            # 轉換為美東時間進行比較
+            if d_ext.tzinfo is not None:
+                d_ext_cmp = d_ext.tz_convert('US/Eastern').replace(tzinfo=None)
             else:
-                # 單一 Ticker 情況
-                ext_series = df_ext_all['Close'].dropna()
-                if not ext_series.empty:
-                    final_price = float(ext_series.iloc[-1])
-                    final_date = pd.to_datetime(ext_series.index[-1]).tz_convert('US/Eastern')
+                d_ext_cmp = d_ext
+            
+            # 如果擴展數據的日期 >= 日線數據日期，則更新
+            if final_date is None:
+                final_price = p_ext
+                final_date = d_ext_cmp
+            else:
+                d_day_cmp = final_date.replace(tzinfo=None) if hasattr(final_date, 'replace') else final_date
+                if d_ext_cmp.date() >= d_day_cmp.date():
+                    final_price = p_ext
+                    final_date = d_ext_cmp
 
         if final_price is not None:
              icon = calculate_status(ticker, final_price, final_date, sentiment_factor)
@@ -347,10 +363,12 @@ if not df_real.empty:
             display_price = 0.0
             is_ext_active = False
 
-    if hasattr(last_date, 'date'):
-        day_diff = (last_date - START_DATE).days
-    else:
-        day_diff = (pd.to_datetime(last_date) - START_DATE).days
+    # 處理可能的時區問題
+    calc_date = last_date
+    if hasattr(calc_date, 'tzinfo') and calc_date.tzinfo is not None:
+        calc_date = calc_date.replace(tzinfo=None)
+    
+    day_diff = (calc_date - START_DATE).days
     
     if 0 <= day_diff < TOTAL_DAYS:
         curr_baseline_val = baseline_prices_adj[day_diff]
