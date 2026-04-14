@@ -125,34 +125,60 @@ all_tickers_list = list(STOCKS_CONFIG.keys())
 sidebar_options = {}
 
 with st.spinner("Updating Market Signals..."):
+    # 1. 抓取日線歷史數據
     df_all = get_stock_data(" ".join(all_tickers_list))
+    # 2. 抓取所有 Ticker 的最新分時數據 (含盤前盤後) 以更新小圓點狀態
+    try:
+        df_ext_all = yf.download(" ".join(all_tickers_list), period='1d', interval='5m', prepost=True, progress=False)
+    except:
+        df_ext_all = pd.DataFrame()
 
 for ticker in all_tickers_list:
     icon = ":gray[●]"
     trend = ""
     try:
-        # Handle MultiIndex or Single ticker return structure
+        # 決定最新價格
+        final_price = None
+        final_date = None
+        
+        # 先從日線找
         if isinstance(df_all.columns, pd.MultiIndex):
             if ticker in df_all['Close'].columns:
                 series = df_all['Close'][ticker].dropna()
                 if not series.empty:
-                    last_val = float(series.iloc[-1])
-                    last_t = pd.to_datetime(series.index[-1])
-                    if isinstance(last_t, pd.Series): last_t = last_t.iloc[0]
-                    # Pass sentiment_factor here
-                    icon = calculate_status(ticker, last_val, last_t, sentiment_factor)
+                    final_price = float(series.iloc[-1])
+                    final_date = pd.to_datetime(series.index[-1])
                     trend = calculate_trend(series)
         else:
-            if len(all_tickers_list) == 1 and all_tickers_list[0] == ticker:
-               series = df_all['Close'].dropna() if 'Close' in df_all else df_all.iloc[:,0].dropna()
-               if not series.empty:
-                   last_val = float(series.iloc[-1])
-                   last_t = pd.to_datetime(series.index[-1])
-                   icon = calculate_status(ticker, last_val, last_t, sentiment_factor)
-                   trend = calculate_trend(series)
-            elif ticker in df_all.columns: 
-                 pass
+             if len(all_tickers_list) == 1 and all_tickers_list[0] == ticker:
+                series = df_all['Close'].dropna() if 'Close' in df_all else df_all.iloc[:,0].dropna()
+                if not series.empty:
+                    final_price = float(series.iloc[-1])
+                    final_date = pd.to_datetime(series.index[-1])
+                    trend = calculate_trend(series)
 
+        # 再從擴展時段數據找 (若有更晚的數據則覆寫)
+        if not df_ext_all.empty:
+            if isinstance(df_ext_all.columns, pd.MultiIndex):
+                if ticker in df_ext_all['Close'].columns:
+                    ext_series = df_ext_all['Close'][ticker].dropna()
+                    if not ext_series.empty:
+                        ext_price = float(ext_series.iloc[-1])
+                        ext_time = pd.to_datetime(ext_series.index[-1]).tz_convert('US/Eastern')
+                        # 如果擴展時段日期與日線最後日期一致或更晚，則使用擴展價格
+                        if final_date is None or ext_time.date() >= final_date.date():
+                            final_price = ext_price
+                            final_date = ext_time
+            else:
+                # 單一 Ticker 情況
+                ext_series = df_ext_all['Close'].dropna()
+                if not ext_series.empty:
+                    final_price = float(ext_series.iloc[-1])
+                    final_date = pd.to_datetime(ext_series.index[-1]).tz_convert('US/Eastern')
+
+        if final_price is not None:
+             icon = calculate_status(ticker, final_price, final_date, sentiment_factor)
+             
     except Exception as e:
         pass 
     
@@ -199,51 +225,45 @@ df_adj["Lower_10"] = df_adj["Baseline"] * 0.90
 
 
 
-# --- Helper: Pre-market Logic (Moved to Top Level with Caching) ---
-@st.cache_data(ttl=20)
-def get_premarket_info(ticker):
+# --- Helper: Extended Hours Price Logic ---
+@st.cache_data(ttl=30)
+def get_latest_price(ticker):
     """
-    獲取盤前價格。改用更穩定的 history 方式，並精準判斷盤前時段。
+    獲取最新價格（包含盤前與盤後）。
     """
     try:
-        now_et = pd.Timestamp.now(tz='US/Eastern')
-        current_date_str = now_et.strftime('%Y-%m-%d')
-        
-        # 2026 紐約股市休市清單
-        holidays_2026 = [
-            '2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03',
-            '2026-05-25', '2026-06-19', '2026-07-03', '2026-09-07',
-            '2026-11-26', '2026-12-25'
-        ]
-        
-        # 周末與休假日不顯示
-        if now_et.dayofweek >= 5 or current_date_str in holidays_2026:
-            return None
-
-        # 定義盤前時段：04:00 - 09:30 ET
-        pm_start = now_et.replace(hour=4, minute=0, second=0, microsecond=0)
-        pm_end = now_et.replace(hour=9, minute=30, second=0, microsecond=0)
-
-        # 非盤前時段則返回 None
-        if not (pm_start <= now_et < pm_end):
-            return None
-            
-        # 獲取最新資料 (只抓最近 1 天的 1 分鐘線，包含盤前)
         t = yf.Ticker(ticker)
-        df_h = t.history(period='1d', interval='1m', prepost=True)
+        # 抓取最近 2 天的高頻分時數據，包含盤前與盤後 (prepost=True)
+        df_h = t.history(period='2d', interval='1m', prepost=True)
         
-        if not df_h.empty:
-            # 取得最後一個價格點
-            last_ts = df_h.index[-1].tz_convert('US/Eastern')
-            # 確保抓到的點確實是「今天」的盤前點（避免抓到昨天的盤後或收盤）
-            if last_ts.date() == now_et.date():
-                return float(df_h['Close'].iloc[-1])
-                
-        # 備援：嘗試 info 中的 preMarketPrice (雖然較慢且不穩定)
-        # info = t.info
-        # val = info.get('preMarketPrice') or info.get('ask') or info.get('bid')
-        # if val and val > 0: return float(val)
+        if df_h.empty:
+            # 備援：如果 history 為空，嘗試從 info 獲取 (雖然較不穩定)
+            info = t.info
+            price = info.get('preMarketPrice') or info.get('postMarketPrice') or info.get('regularMarketPrice') or info.get('currentPrice')
+            if price:
+                return {"price": float(price), "label": "Live", "time": pd.Timestamp.now(tz='US/Eastern')}
+            return None
 
+        # 取得最後一個有效的價格點
+        last_ts = df_h.index[-1].tz_convert('US/Eastern')
+        last_price = float(df_h['Close'].iloc[-1])
+        
+        # 根據美東時間小時判斷當前市場狀態標籤
+        hour = last_ts.hour
+        minute = last_ts.minute
+        time_f = hour + minute/60.0
+        
+        label = ""
+        if 4.0 <= time_f < 9.5:
+            label = "Pre"
+        elif 9.5 <= time_f < 16.0:
+            label = "Live" # Regular session
+        elif 16.0 <= time_f <= 20.0:
+            label = "Post"
+        else:
+            label = "Ext" # Extended (凌晨或其他)
+            
+        return {"price": last_price, "label": label, "time": last_ts}
     except Exception:
         pass
     return None
@@ -296,13 +316,36 @@ if not df_real.empty:
             last_date = last_date.iloc[0]
         
         current_price = float(last_row['Close_Flat'])
+        
+        # --- 集成最新擴展時段價格 ---
+        ext_info = get_latest_price(selected_ticker)
+        is_ext_active = False
+        display_price = current_price
+        
+        if ext_info:
+            # 只有當擴展價格的時間晚於或等於日線最後日期時才考慮顯現
+            ext_time = ext_info['time']
+            if ext_time.date() >= last_date.date():
+                display_price = ext_info['price']
+                is_ext_active = True
+                # 若擴展價格存在，決策邏輯改用擴展價格
+                current_price = display_price 
     else:
         # Fallback if no valid price data exists
         last_row = df_plot.iloc[-1]
         last_date = pd.to_datetime(last_row['Date'])
         if isinstance(last_date, pd.Series):
             last_date = last_date.iloc[0]
-        current_price = 0.0
+        
+        ext_info = get_latest_price(selected_ticker)
+        if ext_info:
+            current_price = ext_info['price']
+            display_price = current_price
+            is_ext_active = True
+        else:
+            current_price = 0.0
+            display_price = 0.0
+            is_ext_active = False
 
     if hasattr(last_date, 'date'):
         day_diff = (last_date - START_DATE).days
@@ -353,20 +396,20 @@ if not df_real.empty:
         }
         main_color = color_map.get(signal_type, "#e0e0e0")
 
-        pre_market_price = get_premarket_info(selected_ticker)
-        
-        # Pre-market strings
+        # Pre-market / Post-market strings for Display
         pm_price_str = ""
         pm_dev_str = ""
         
-        if pre_market_price:
-            pm_price_str = f'<span class="pre-market-text">(Pre: ${pre_market_price:.2f})</span>'
+        if is_ext_active and ext_info:
+            label = ext_info['label']
+            price_val = ext_info['price']
+            pm_price_str = f'<span class="pre-market-text">({label}: ${price_val:.2f})</span>'
             
-            # Calculate Deviation for Pre-market
+            # Calculate Deviation for Pre-market compared to Adj Base
             if curr_baseline_val > 0:
-                pm_delta = pre_market_price - curr_baseline_val
+                pm_delta = price_val - curr_baseline_val
                 pm_pct = (pm_delta / curr_baseline_val) * 100
-                pm_dev_str = f'<span class="pre-market-text">(Pre: {pm_pct:+.2f}%)</span>'
+                pm_dev_str = f'<span class="pre-market-text">({label}: {pm_pct:+.2f}%)</span>'
 
         # Container for Metrics
         chart_space = st.empty()
@@ -445,39 +488,45 @@ if not df_plot.empty:
         line=dict(color='red', width=4)
     ))
 
-# Add Pre-market Point if available
-if pre_market_price:
-    # 1. Determine the target date (today's date in ET, aligned to 00:00:00 for the chart)
-    now_et = pd.Timestamp.now(tz='US/Eastern')
-    target_date = pd.to_datetime(now_et.date())
-    
-    # 2. Add Marker (Increased size for visibility)
+# Add Pre-market / Extended Point if active
+if is_ext_active and ext_info:
+    # 判斷繪圖日期點
+    ext_ts = ext_info['time']
+    # 放在該日期的 00:00:00 (與日線對齊)
+    target_date_plot = pd.to_datetime(ext_ts.date())
+    ext_price_plot = ext_info['price']
+    label_plot = ext_info['label']
+
+    # 1. Add Marker
     fig.add_trace(go.Scatter(
-        x=[target_date], 
-        y=[pre_market_price], 
-        mode='markers', 
-        name='Pre-market',
-        marker=dict(color='#00ff00', size=10, symbol='circle', line=dict(color='white', width=1)),
+        x=[target_date_plot], 
+        y=[ext_price_plot], 
+        mode='markers+text', 
+        name=f'{label_plot}-market',
+        text=[f" {label_plot}"],
+        textposition="top right",
+        marker=dict(color='#00ff00', size=12, symbol='diamond', line=dict(color='white', width=1)),
         showlegend=False
     ))
 
-    # 3. Add Connecting Line (from last valid close to pre-market)
+    # 2. Add Connecting Line (from last valid close to extended point)
     if not df_plot.empty:
-        # Find last row with valid data to connect from
         df_valid_conn = df_plot.dropna(subset=['Close_Flat'])
         if not df_valid_conn.empty:
             last_valid_row = df_valid_conn.iloc[-1]
             last_date_v = pd.to_datetime(last_valid_row['Date'])
             last_price_v = float(last_valid_row['Close_Flat'])
             
-            fig.add_trace(go.Scatter(
-                x=[last_date_v, target_date],
-                y=[last_price_v, pre_market_price],
-                mode='lines',
-                name='Pre-market Link',
-                line=dict(color='#00ff00', width=3, dash='dot'), # Dotted green link
-                showlegend=False
-            ))
+            # 只有當時間點不同時才拉線，否則只是重疊
+            if last_date_v != target_date_plot:
+                fig.add_trace(go.Scatter(
+                    x=[last_date_v, target_date_plot],
+                    y=[last_price_v, ext_price_plot],
+                    mode='lines',
+                    name='Ext-market Link',
+                    line=dict(color='#00ff00', width=2, dash='dot'),
+                    showlegend=False
+                ))
 
 # --- Calculate Fixed Axis Range ---
 # Determine min/max across all relevant series to fix the view
