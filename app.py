@@ -93,11 +93,13 @@ def calculate_status(ticker, price, date_obj, sentiment=1.0):
         lower_bound = curr_baseline * 0.90
         
         if price <= lower_bound:
-            status_icon = ":green[●]"
+            status_icon = "🟢" # Buy
         elif price >= upper_bound_2:
-            status_icon = ":red[●]"
+            status_icon = "🔴" # Exit
         elif price >= upper_bound_1:
-            status_icon = ":orange[●]"
+            status_icon = "🟠" # Reduce
+        else:
+            status_icon = "⚪" # Hold
             
     return status_icon
 

@@ -1,0 +1,183 @@
+/* Standards/fonts and UI/ui_styles.css */
+/* 全域設定 */
+:root {
+    --background-color: #09090b !important;
+    --secondary-background-color: #18181b !important;
+    --font: 'Myriad Pro', 'Microsoft JhengHei', sans-serif !important;
+}
+
+html, body, .stApp, .main, [data-testid="stAppViewContainer"], 
+p, h1, h2, h3, h4, h5, h6, li, label, div[data-testid="stMarkdownContainer"],
+div[data-testid="stMarkdownContainer"] span {
+    font-family: 'Myriad Pro', 'Microsoft JhengHei', sans-serif !important;
+}
+
+/* 確保 Header 左側收合鈕內的 Material Ligature 文字 (chevron_right 等) 正常渲染為圖示 */
+[data-testid="stHeader"] [data-testid="collapsedControl"] span,
+[data-testid="stSidebarCollapsedControl"] span {
+    font-family: 'Material Symbols Rounded' !important;
+}
+
+html, body, .stApp, .main, [data-testid="stAppViewContainer"] {
+    background-color: #09090b !important;
+    background-image: none !important; /* 殺掉所有隱藏的漸層層 */
+    filter: none !important; /* 殺掉任何 CSS 提亮濾鏡 */
+}
+
+[data-testid="stSidebar"], [data-testid="stSidebar"] > div:first-child {
+    background-color: #18181b !important;
+    background-image: none !important;
+}
+
+/* 確保頂部沒有漸層或陰影濾鏡遮罩 */
+[data-testid="stHeader"] {
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+}
+
+h1 {
+    font-size: 24px !important;
+    font-weight: bold !important;
+    color: #a1a1aa !important;
+}
+
+h2 {
+    font-size: 22px !important;
+    font-weight: bold !important;
+    color: #FF9800 !important;
+}
+
+/* 隱藏預設元件 */
+div[data-testid="stSidebar"] > div:nth-child(2) { display: none !important; }
+.stSidebar > div:nth-child(2) { display: none !important; }
+div[class^="stSidebar"] > div[class^="resize-tr"] { display: none !important; }
+[data-testid="stElementToolbar"] { display: none; }
+
+/* 指標卡片設定 */
+.metric-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+    justify-content: space-between;
+}
+
+.metric-card {
+    flex: 1 1 140px;
+    background-color: #18181b !important; /* 卡片框底色 */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.metric-card:hover {
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.metric-label {
+    color: #FF9800 !important; /* 小標題 */
+    font-size: 16px !important;
+    font-weight: normal !important;
+    margin-bottom: 4px;
+}
+
+.metric-value {
+    color: #ffffff !important; /* 主數字 */
+    font-size: 36px !important;
+    font-weight: bold !important;
+    line-height: 1.2;
+}
+
+.metric-sub {
+    color: #B5B5B5 !important; /* 副標題 */
+    font-size: 14px !important;
+    font-weight: normal !important;
+    margin-top: 4px;
+}
+
+.pre-market-text {
+    color: #80CF59 !important; /* 盤前標籤 */
+    font-size: 16px !important;
+    font-weight: bold !important;
+    margin-left: 5px;
+}
+
+.signal-value {
+    font-size: 20px !important;
+    font-weight: bold !important;
+    color: #ffffff !important;
+}
+
+/* 圖表外框：維持圓角與卡片質感，並隱藏突兀的雙層底色 */
+[data-testid="stPlotlyChart"] {
+    background-color: #18181b !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 8px !important;
+    padding: 10px !important;
+    overflow: hidden !important;
+}
+
+/* Sidebar Custom Adjustments */
+[data-testid="stSidebar"] h1:first-of-type {
+    margin-top: 36px !important; /* H1 兩端水平對齊 */
+}
+
+/* Radio Button Ticker Formatting (List split by virtual vertical segment) */
+[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p em {
+    font-style: normal !important;
+    display: inline-block;
+    width: 65px; /* 回調寬度：相較於 36px，16px 的字只需較小的固定寬度來畫分隔線 */
+    border-right: 1px solid rgba(255, 255, 255, 0.4) !important; /* 分隔線 */
+    margin-right: 12px;
+    padding-right: 8px;
+    font-weight: bold !important;
+    color: #ffffff !important;
+}
+
+/* Radio Button typography style (Ticker List) */
+[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p {
+    color: #ffffff;
+    font-size: 16px !important;
+    font-weight: bold !important;
+    display: flex;
+    align-items: center;
+    gap: 8px; /* 增加文字與 Emoji 間距 */
+}
+
+/* 確保 Emoji 訊號燈號大小與對齊 */
+[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p span {
+    font-size: 18px !important;
+    line-height: 1 !important;
+}
+
+/* Checkbox base typography style to match Y-axis specs (Auto-Refresh) */
+[data-testid="stCheckbox"] label [data-testid="stMarkdownContainer"] p {
+    color: #B5B5B5 !important;
+    font-size: 14px !important;
+    font-weight: normal !important;
+}
+
+/* Market Sentiment Select Slider thumb label tuning to match Current Price metric design */
+[data-testid="stThumbValue"] {
+    color: #FF9800 !important;
+    font-size: 16px !important;
+    font-weight: bold !important;
+    font-family: 'Myriad Pro', 'Microsoft JhengHei', sans-serif !important;
+}
+
+/* ======= Icon Overrides ======= */
+
+/* 1. 修復全域的系統內建按鈕圖示，防止因強力字體覆寫導致變成亂碼字串 */
+.material-symbols-rounded, .stIcon, [class*="Icon"] {
+    font-family: 'Material Symbols Rounded' !important;
+}
+
+
+/* 隱藏最底部的 Streamlit 浮水印 (若有需要) */
+footer {
+    visibility: hidden !important;
+    display: none !important;
+}
