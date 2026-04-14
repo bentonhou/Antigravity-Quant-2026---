@@ -93,13 +93,11 @@ def calculate_status(ticker, price, date_obj, sentiment=1.0):
         lower_bound = curr_baseline * 0.90
         
         if price <= lower_bound:
-            status_icon = "🟢" # Buy
+            status_icon = ":green[●]"
         elif price >= upper_bound_2:
-            status_icon = "🔴" # Exit
+            status_icon = ":red[●]"
         elif price >= upper_bound_1:
-            status_icon = "🟠" # Reduce
-        else:
-            status_icon = "⚪" # Hold
+            status_icon = ":orange[●]"
             
     return status_icon
 
@@ -143,61 +141,42 @@ for ticker in all_tickers_list:
     icon = ":gray[●]"
     trend = ""
     try:
-        # 決定最新價格
         final_price = None
         final_date = None
         
-        # Helper 提取最新值
-        def get_series_last(df, attr, tk):
+        # 1. 抓取日線數據 (原始邏輯)
+        if isinstance(df_all.columns, pd.MultiIndex):
+            if ticker in df_all['Close'].columns:
+                series = df_all['Close'][ticker].dropna()
+                if not series.empty:
+                    final_price = float(series.iloc[-1])
+                    final_date = pd.to_datetime(series.index[-1]).replace(tzinfo=None)
+                    trend = calculate_trend(series)
+        
+        # 2. 抓取延伸/盤前數據 (橋接邏輯)
+        if not df_ext_all.empty:
             try:
-                if isinstance(df.columns, pd.MultiIndex):
-                    if attr in df.columns.levels[0] and tk in df[attr].columns:
-                        s = df[attr][tk].dropna()
-                        if not s.empty:
-                            return float(s.iloc[-1]), pd.to_datetime(s.index[-1])
-                elif attr in df.columns: # Single ticker structure
-                    s = df[attr].dropna()
-                    if not s.empty:
-                        return float(s.iloc[-1]), pd.to_datetime(s.index[-1])
-            except: pass
-            return None, None
+                # 判斷 MultiIndex 結構並尋找對應 Ticker 的 Close
+                ext_s = None
+                if isinstance(df_ext_all.columns, pd.MultiIndex):
+                    if 'Close' in df_ext_all.columns.get_level_values(0) and ticker in df_ext_all['Close'].columns:
+                        ext_s = df_ext_all['Close'][ticker].dropna()
+                
+                if ext_s is not None and not ext_s.empty:
+                    e_price = float(ext_s.iloc[-1])
+                    e_date = pd.to_datetime(ext_s.index[-1]).tz_convert('US/Eastern').replace(tzinfo=None)
+                    
+                    # 若盤前數據較新或屬於同一天，則採用之
+                    if final_date is None or e_date.date() >= final_date.date():
+                        final_price = e_price
+                        final_date = e_date
+            except:
+                pass
 
-        # 先從日線提取
-        p_day, d_day = get_series_last(df_all, 'Close', ticker)
-        if p_day is not None:
-            final_price = p_day
-            final_date = d_day
-            # 計算趨勢 (僅用日線)
-            try:
-                if isinstance(df_all.columns, pd.MultiIndex):
-                    trend = calculate_trend(df_all['Close'][ticker].dropna())
-                else:
-                    trend = calculate_trend(df_all['Close'].dropna())
-            except: pass
-
-        # 再從擴展時段數據提取 (若有更晚的數據則覆寫)
-        p_ext, d_ext = get_series_last(df_ext_all, 'Close', ticker)
-        if p_ext is not None:
-            # 轉換為美東時間進行比較
-            if d_ext.tzinfo is not None:
-                d_ext_cmp = d_ext.tz_convert('US/Eastern').replace(tzinfo=None)
-            else:
-                d_ext_cmp = d_ext
-            
-            # 如果擴展數據的日期 >= 日線數據日期，則更新
-            if final_date is None:
-                final_price = p_ext
-                final_date = d_ext_cmp
-            else:
-                d_day_cmp = final_date.replace(tzinfo=None) if hasattr(final_date, 'replace') else final_date
-                if d_ext_cmp.date() >= d_day_cmp.date():
-                    final_price = p_ext
-                    final_date = d_ext_cmp
-
-        if final_price is not None:
+        if final_price is not None and final_date is not None:
              icon = calculate_status(ticker, final_price, final_date, sentiment_factor)
              
-    except Exception as e:
+    except Exception:
         pass 
     
     label = f"*{ticker}* {icon}"

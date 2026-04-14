@@ -142,15 +142,8 @@ div[class^="stSidebar"] > div[class^="resize-tr"] { display: none !important; }
     color: #ffffff;
     font-size: 16px !important;
     font-weight: bold !important;
-    display: flex;
+    display: flex; /* 保持跟原生點擊圓圈良好垂直置中 */
     align-items: center;
-    gap: 8px; /* 增加文字與 Emoji 間距 */
-}
-
-/* 確保 Emoji 訊號燈號大小與對齊 */
-[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p span {
-    font-size: 18px !important;
-    line-height: 1 !important;
 }
 
 /* Checkbox base typography style to match Y-axis specs (Auto-Refresh) */
