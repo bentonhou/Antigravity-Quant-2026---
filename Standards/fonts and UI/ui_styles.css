@@ -139,11 +139,18 @@ div[class^="stSidebar"] > div[class^="resize-tr"] { display: none !important; }
 
 /* Radio Button typography style (Ticker List) */
 [data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p {
-    color: #ffffff !important;
+    color: #ffffff; /* 移除 !important，允許訊號燈號顏色渲染 */
     font-size: 16px !important;
     font-weight: bold !important;
     display: flex; /* 保持跟原生點擊圓圈良好垂直置中 */
     align-items: center;
+}
+
+/* 讓側邊欄的訊號圓點稍微放大，增加辨識度 */
+[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p span {
+    font-size: 20px !important;
+    line-height:1 !important;
+    margin-left: 2px;
 }
 
 /* Checkbox base typography style to match Y-axis specs (Auto-Refresh) */
