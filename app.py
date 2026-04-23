@@ -23,6 +23,8 @@ STOCKS_CONFIG = {
     "AMZN": {"start": 237.21, "target": 285.0},
     "AVGO": {"start": 347.62, "target": 475.0},
     "MRVL": {"start": 89.39,  "target": 123.0},
+    "ANET": {"start": 133.60, "target": 235.0},
+    "ETN":  {"start": 326.29, "target": 485.0},
     "NOK":  {"start": 6.51,   "target": 8.50},
 }
 
