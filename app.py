@@ -287,6 +287,12 @@ upper_bound_1_val = 0
 upper_bound_2_val = 0
 delta_pct = 0.0
 
+# --- IMPORTANT: initialize ext vars at outer scope so chart code can always access them ---
+ext_info = None
+is_ext_active = False
+last_row = None
+last_date = None
+
 if not df_real.empty:
     # Flatten MultiIndex if necessary for consistent extraction
     if isinstance(df_real.columns, pd.MultiIndex):
@@ -319,7 +325,6 @@ if not df_real.empty:
         
         # --- 集成最新擴展時段價格 ---
         ext_info = get_latest_price(selected_ticker)
-        is_ext_active = False
         display_price = current_price
         
         if ext_info:
@@ -345,7 +350,6 @@ if not df_real.empty:
         else:
             current_price = 0.0
             display_price = 0.0
-            is_ext_active = False
 
     # 處理可能的時區問題
     calc_date = last_date
@@ -497,51 +501,62 @@ if not df_plot.empty:
 
 # --- Continuous Extended Hours Line (Green Line) ---
 if is_ext_active and ext_info and "df" in ext_info:
-    df_h = ext_info["df"]
+    df_h = ext_info["df"].copy()
     if not df_h.empty:
-        # Convert index to US/Eastern
-        df_h.index = df_h.index.tz_convert('US/Eastern')
-        
-        # Determine the cutoff: we only want to show data after the last DAILY close point
-        # to avoid messy overlaps.
-        if not df_plot.empty:
-            last_daily_date = pd.to_datetime(df_plot["Date"].iloc[-1]).replace(tzinfo=None)
-            last_daily_price = float(df_plot["Close_Flat"].iloc[-1])
+        try:
+            # Ensure index is timezone-aware and convert to US/Eastern
+            if df_h.index.tzinfo is None:
+                df_h.index = df_h.index.tz_localize('UTC')
+            df_h.index = df_h.index.tz_convert('US/Eastern')
             
-            # Filter intraday data that is AFTER the last daily close
-            # Note: df_h index is localized, so we need to compare carefully
-            df_ext_plot = df_h[df_h.index.tz_localize(None) >= last_daily_date].copy()
+            # Extract Close column (handle MultiIndex from yfinance)
+            if isinstance(df_h.columns, pd.MultiIndex):
+                close_col = df_h['Close'].iloc[:, 0]
+            else:
+                close_col = df_h['Close']
+            df_h = df_h.copy()
+            df_h['_Close'] = close_col.values
             
-            if not df_ext_plot.empty:
-                # Prepend the last daily close point for continuity
-                # We create a single-row DataFrame with the same columns as df_ext_plot
-                # and use the last_daily_date as the index.
-                # However, df_ext_plot.index is localized. So we localize last_daily_date too.
-                try:
-                    conn_idx = pd.Timestamp(last_daily_date).tz_localize('US/Eastern')
-                    df_conn = pd.DataFrame({'Close': [last_daily_price]}, index=[conn_idx])
-                    df_ext_plot = pd.concat([df_conn, df_ext_plot])
-                except:
-                    pass
+            if not df_plot.empty and last_date is not None:
+                # Get last daily close info
+                last_daily_date_naive = pd.to_datetime(last_date).replace(tzinfo=None)
+                last_daily_price = float(last_row['Close_Flat']) if last_row is not None else current_price
                 
-                fig.add_trace(go.Scatter(
-                    x=df_ext_plot.index, 
-                    y=df_ext_plot['Close'],
-                    mode='lines',
-                    name=f'{ext_info["label"]}-market',
-                    line=dict(color='#80CF59', width=3, dash='dot'), # Match pre-market-text color
-                    hovertemplate="Price: $%{y:.2f}<br>Time: %{x}<extra></extra>"
-                ))
+                # Filter: keep only intraday rows from the last daily date onwards
+                # Safely strip tz from the localized index for comparison
+                idx_naive = df_h.index.tz_convert('UTC').tz_localize(None)
+                df_ext_plot = df_h[idx_naive >= last_daily_date_naive].copy()
                 
-                # Also add a marker at the very end
-                fig.add_trace(go.Scatter(
-                    x=[df_ext_plot.index[-1]], 
-                    y=[df_ext_plot['Close'].iloc[-1]],
-                    mode='markers',
-                    name='Latest',
-                    marker=dict(color='#00ff00', size=10, symbol='diamond'),
-                    showlegend=False
-                ))
+                if not df_ext_plot.empty:
+                    # Prepend last daily close as connecting anchor point
+                    try:
+                        conn_idx = pd.Timestamp(last_daily_date_naive).tz_localize('America/New_York')
+                        df_conn = pd.DataFrame({'_Close': [last_daily_price]}, index=[conn_idx])
+                        df_ext_plot = pd.concat([df_conn, df_ext_plot[['_Close']]])
+                    except Exception:
+                        pass
+                    
+                    fig.add_trace(go.Scatter(
+                        x=df_ext_plot.index,
+                        y=df_ext_plot['_Close'],
+                        mode='lines',
+                        name=f'{ext_info["label"]}-market',
+                        line=dict(color='#80CF59', width=3, dash='dot'),
+                        hovertemplate="%{y:.2f}<br>%{x}<extra>Pre/Post</extra>"
+                    ))
+                    
+                    # Diamond marker at latest point
+                    fig.add_trace(go.Scatter(
+                        x=[df_ext_plot.index[-1]],
+                        y=[df_ext_plot['_Close'].iloc[-1]],
+                        mode='markers',
+                        marker=dict(color='#80CF59', size=10, symbol='diamond',
+                                    line=dict(color='white', width=1)),
+                        showlegend=False,
+                        hoverinfo='skip'
+                    ))
+        except Exception as _e:
+            pass  # Silently skip if any tz/data issue occurs
 
 # --- Calculate Fixed Axis Range ---
 # Determine min/max across all relevant series to fix the view
