@@ -196,6 +196,7 @@ selected_display = st.sidebar.radio("Ticker", display_keys, label_visibility="co
 selected_ticker = sidebar_options[selected_display]
 
 auto_refresh = st.sidebar.checkbox("Auto-Refresh (60s)", value=True)
+debug_mode = st.sidebar.checkbox("Debug Mode", value=False)
 
 # --- Logic: Baseline ---
 config = STOCKS_CONFIG[selected_ticker]
@@ -229,26 +230,23 @@ df_adj["Lower_10"] = df_adj["Baseline"] * 0.90
 @st.cache_data(ttl=30)
 def get_latest_price(ticker):
     """
-    獲取最新價格（包含盤前與盤後）。
+    獲取最新價格（包含盤前與盤後）。回傳價格、標籤、時間。
+    注意：不快取整個 DataFrame，避免 st.cache_data 的序列化問題。
     """
     try:
         t = yf.Ticker(ticker)
-        # 抓取最近 2 天的高頻分時數據，包含盤前與盤後 (prepost=True)
         df_h = t.history(period='2d', interval='1m', prepost=True)
         
         if df_h.empty:
-            # 備援：如果 history 為空，嘗試從 info 獲取 (雖然較不穩定)
             info = t.info
             price = info.get('preMarketPrice') or info.get('postMarketPrice') or info.get('regularMarketPrice') or info.get('currentPrice')
             if price:
                 return {"price": float(price), "label": "Live", "time": pd.Timestamp.now(tz='US/Eastern')}
             return None
 
-        # 取得最後一個有效的價格點
         last_ts = df_h.index[-1].tz_convert('US/Eastern')
         last_price = float(df_h['Close'].iloc[-1])
         
-        # 根據美東時間小時判斷當前市場狀態標籤
         hour = last_ts.hour
         minute = last_ts.minute
         time_f = hour + minute/60.0
@@ -257,16 +255,28 @@ def get_latest_price(ticker):
         if 4.0 <= time_f < 9.5:
             label = "Pre"
         elif 9.5 <= time_f < 16.0:
-            label = "Live" # Regular session
+            label = "Live"
         elif 16.0 <= time_f <= 20.0:
             label = "Post"
         else:
-            label = "Ext" # Extended (凌晨或其他)
+            label = "Ext"
             
-        return {"price": last_price, "label": label, "time": last_ts, "df": df_h}
+        return {"price": last_price, "label": label, "time": last_ts}
     except Exception:
         pass
     return None
+
+def get_ext_df(ticker):
+    """
+    獲取最新的分時 DataFrame（不快取，每次直接抓取）。
+    避免大型 DataFrame 放入 st.cache_data 造成序列化問題。
+    """
+    try:
+        t = yf.Ticker(ticker)
+        df_h = t.history(period='2d', interval='1m', prepost=True)
+        return df_h
+    except Exception:
+        return pd.DataFrame()
 
 # --- Main Logic ---
 st.markdown(f"<h2>{selected_ticker} Wave Navigator</h2>", unsafe_allow_html=True)
@@ -322,19 +332,19 @@ if not df_real.empty:
             last_date = last_date.iloc[0]
         
         current_price = float(last_row['Close_Flat'])
+        daily_close_price = current_price  # 保留每日收盤做顯示用
         
         # --- 集成最新擴展時段價格 ---
         ext_info = get_latest_price(selected_ticker)
         display_price = current_price
         
         if ext_info:
-            # 只有當擴展價格的時間晚於或等於日線最後日期時才考慮顯現
             ext_time = ext_info['time']
             if ext_time.date() >= last_date.date():
                 display_price = ext_info['price']
                 is_ext_active = True
-                # 若擴展價格存在，決策邏輯改用擴展價格
-                current_price = display_price 
+                # 信號邏輯改用盤前價格
+                current_price = display_price
     else:
         # Fallback if no valid price data exists
         last_row = df_plot.iloc[-1]
@@ -402,20 +412,20 @@ if not df_real.empty:
         }
         main_color = color_map.get(signal_type, "#e0e0e0")
 
-        # Pre-market / Post-market strings for Display
-        pm_price_str = ""
-        pm_dev_str = ""
-        
+        # --- 小卡盤前顯示字串 ---
+        # 分別計算 daily close 偏差 與 pre-market 偏差
+        daily_close_price = daily_close_price if is_ext_active else current_price
+        daily_delta_pct = (daily_close_price - curr_baseline_val) / curr_baseline_val * 100 if curr_baseline_val != 0 else 0.0
+        ext_delta_pct = (current_price - curr_baseline_val) / curr_baseline_val * 100 if (is_ext_active and curr_baseline_val != 0) else None
+
+        # Card 1: pre-market price (same font, green)
+        pre_price_str = ""
+        pre_dev_str = ""
         if is_ext_active and ext_info:
-            label = ext_info['label']
-            price_val = ext_info['price']
-            pm_price_str = f'<span class="pre-market-text">({label}: ${price_val:.2f})</span>'
-            
-            # Calculate Deviation for Pre-market compared to Adj Base
-            if curr_baseline_val > 0:
-                pm_delta = price_val - curr_baseline_val
-                pm_pct = (pm_delta / curr_baseline_val) * 100
-                pm_dev_str = f'<span class="pre-market-text">({label}: {pm_pct:+.2f}%)</span>'
+            ext_label = ext_info['label']
+            pre_price_str = f'<span class="pre-market-text"> ({ext_label}: ${current_price:.2f})</span>'
+            if ext_delta_pct is not None:
+                pre_dev_str = f'<span class="pre-market-text"> ({ext_label}: {ext_delta_pct:+.2f}%)</span>'
 
         # Container for Metrics
         chart_space = st.empty()
@@ -430,8 +440,8 @@ if not df_real.empty:
     <div class="metric-container">
     <div class="metric-card">
     <div class="metric-label">{main_label}</div>
-    <div class="metric-value">${current_price:.2f}</div>
-    <div class="metric-sub">{last_date.strftime('%Y-%m-%d')} Close: ${float(last_row['Close_Flat']):.2f}</div>
+    <div class="metric-value">${daily_close_price:.2f}{pre_price_str}</div>
+    <div class="metric-sub">{last_date.strftime('%Y-%m-%d')}</div>
     </div>
     <div class="metric-card">
     <div class="metric-label">Adj Target</div>
@@ -440,7 +450,7 @@ if not df_real.empty:
     </div>
     <div class="metric-card">
     <div class="metric-label">Deviation</div>
-    <div class="metric-value">{delta_pct:+.2f}%{pm_dev_str}</div>
+    <div class="metric-value">{daily_delta_pct:+.2f}%{pre_dev_str}</div>
     <div class="metric-sub">from Adj Base</div>
     </div>
     <div class="metric-card" style="{current_card_style}">
@@ -459,6 +469,19 @@ else:
     st.warning("No data found for 2026. Market may be closed or future date not reached.")
     df_plot = pd.DataFrame()
 
+# --- Debug Output (shown in sidebar when enabled) ---
+if debug_mode:
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("**🔍 Debug Info**")
+    st.sidebar.write(f"is_ext_active: `{is_ext_active}`")
+    if ext_info:
+        st.sidebar.write(f"ext label: `{ext_info['label']}`")
+        st.sidebar.write(f"ext price: `{ext_info['price']:.2f}`")
+        st.sidebar.write(f"ext time: `{ext_info['time']}`")
+    else:
+        st.sidebar.write("ext_info: `None`")
+    st.sidebar.write(f"last_date: `{last_date}`")
+    st.sidebar.write(f"current_price: `{current_price:.2f}`")
 
 # --- Visualization ---
 fig = go.Figure()
@@ -500,39 +523,39 @@ if not df_plot.empty:
     ))
 
 # --- Continuous Extended Hours Line (Green Line) ---
-if is_ext_active and ext_info and "df" in ext_info:
-    df_h = ext_info["df"].copy()
-    if not df_h.empty:
+if is_ext_active and ext_info:
+    # Fetch the raw intraday DataFrame (not cached)
+    df_h_raw = get_ext_df(selected_ticker)
+    if not df_h_raw.empty:
         try:
+            df_h = df_h_raw.copy()
             # Ensure index is timezone-aware and convert to US/Eastern
             if df_h.index.tzinfo is None:
                 df_h.index = df_h.index.tz_localize('UTC')
             df_h.index = df_h.index.tz_convert('US/Eastern')
             
-            # Extract Close column (handle MultiIndex from yfinance)
+            # Extract Close column safely
             if isinstance(df_h.columns, pd.MultiIndex):
-                close_col = df_h['Close'].iloc[:, 0]
+                close_col = df_h['Close'].iloc[:, 0].values
             else:
-                close_col = df_h['Close']
-            df_h = df_h.copy()
-            df_h['_Close'] = close_col.values
+                close_col = df_h['Close'].values
+            
+            df_ext = pd.DataFrame({'_Close': close_col}, index=df_h.index)
             
             if not df_plot.empty and last_date is not None:
-                # Get last daily close info
                 last_daily_date_naive = pd.to_datetime(last_date).replace(tzinfo=None)
                 last_daily_price = float(last_row['Close_Flat']) if last_row is not None else current_price
                 
-                # Filter: keep only intraday rows from the last daily date onwards
-                # Safely strip tz from the localized index for comparison
-                idx_naive = df_h.index.tz_convert('UTC').tz_localize(None)
-                df_ext_plot = df_h[idx_naive >= last_daily_date_naive].copy()
+                # Strip tz safely for comparison
+                idx_naive = df_ext.index.tz_convert('UTC').tz_localize(None)
+                df_ext_plot = df_ext[idx_naive >= last_daily_date_naive].copy()
                 
                 if not df_ext_plot.empty:
-                    # Prepend last daily close as connecting anchor point
+                    # Prepend last daily close as connecting anchor
                     try:
                         conn_idx = pd.Timestamp(last_daily_date_naive).tz_localize('America/New_York')
                         df_conn = pd.DataFrame({'_Close': [last_daily_price]}, index=[conn_idx])
-                        df_ext_plot = pd.concat([df_conn, df_ext_plot[['_Close']]])
+                        df_ext_plot = pd.concat([df_conn, df_ext_plot])
                     except Exception:
                         pass
                     
@@ -541,22 +564,12 @@ if is_ext_active and ext_info and "df" in ext_info:
                         y=df_ext_plot['_Close'],
                         mode='lines',
                         name=f'{ext_info["label"]}-market',
-                        line=dict(color='#80CF59', width=3, dash='dot'),
+                        line=dict(color='#80CF59', width=4),
                         hovertemplate="%{y:.2f}<br>%{x}<extra>Pre/Post</extra>"
                     ))
-                    
-                    # Diamond marker at latest point
-                    fig.add_trace(go.Scatter(
-                        x=[df_ext_plot.index[-1]],
-                        y=[df_ext_plot['_Close'].iloc[-1]],
-                        mode='markers',
-                        marker=dict(color='#80CF59', size=10, symbol='diamond',
-                                    line=dict(color='white', width=1)),
-                        showlegend=False,
-                        hoverinfo='skip'
-                    ))
         except Exception as _e:
-            pass  # Silently skip if any tz/data issue occurs
+            pass
+
 
 # --- Calculate Fixed Axis Range ---
 # Determine min/max across all relevant series to fix the view
