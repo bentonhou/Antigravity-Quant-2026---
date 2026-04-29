@@ -26,6 +26,7 @@ STOCKS_CONFIG = {
     "ANET": {"start": 133.60, "target": 235.0},
     "ETN":  {"start": 326.29, "target": 485.0},
     "NOK":  {"start": 6.51,   "target": 8.50},
+    "UMC":  {"start": 7.77,   "target": 13.00},
 }
 
 START_DATE = datetime(2026, 1, 1)
@@ -262,7 +263,7 @@ def get_latest_price(ticker):
         else:
             label = "Ext" # Extended (凌晨或其他)
             
-        return {"price": last_price, "label": label, "time": last_ts}
+        return {"price": last_price, "label": label, "time": last_ts, "df": df_h}
     except Exception:
         pass
     return None
@@ -416,12 +417,17 @@ if not df_real.empty:
         chart_space = st.empty()
         
         with chart_space.container():
+            # Decide on the main label
+            main_label = "Current Price"
+            if is_ext_active and ext_info:
+                main_label = f"{ext_info['label']} Price"
+
             st.markdown(textwrap.dedent(f"""
     <div class="metric-container">
     <div class="metric-card">
-    <div class="metric-label">Current Price</div>
-    <div class="metric-value">${current_price:.2f}{pm_price_str}</div>
-    <div class="metric-sub">{last_date.strftime('%Y-%m-%d')}</div>
+    <div class="metric-label">{main_label}</div>
+    <div class="metric-value">${current_price:.2f}</div>
+    <div class="metric-sub">{last_date.strftime('%Y-%m-%d')} Close: ${float(last_row['Close_Flat']):.2f}</div>
     </div>
     <div class="metric-card">
     <div class="metric-label">Adj Target</div>
@@ -489,43 +495,51 @@ if not df_plot.empty:
         line=dict(color='red', width=4)
     ))
 
-# Add Pre-market / Extended Point if active
-if is_ext_active and ext_info:
-    # 判斷繪圖日期點
-    ext_ts = ext_info['time']
-    # 放在該日期的 00:00:00 (與日線對齊)
-    target_date_plot = pd.to_datetime(ext_ts.date())
-    ext_price_plot = ext_info['price']
-    label_plot = ext_info['label']
-
-    # 1. Add Marker
-    fig.add_trace(go.Scatter(
-        x=[target_date_plot], 
-        y=[ext_price_plot], 
-        mode='markers+text', 
-        name=f'{label_plot}-market',
-        text=[f" {label_plot}"],
-        textposition="top right",
-        marker=dict(color='#00ff00', size=12, symbol='diamond', line=dict(color='white', width=1)),
-        showlegend=False
-    ))
-
-    # 2. Add Connecting Line (from last valid close to extended point)
-    if not df_plot.empty:
-        df_valid_conn = df_plot.dropna(subset=['Close_Flat'])
-        if not df_valid_conn.empty:
-            last_valid_row = df_valid_conn.iloc[-1]
-            last_date_v = pd.to_datetime(last_valid_row['Date'])
-            last_price_v = float(last_valid_row['Close_Flat'])
+# --- Continuous Extended Hours Line (Green Line) ---
+if is_ext_active and ext_info and "df" in ext_info:
+    df_h = ext_info["df"]
+    if not df_h.empty:
+        # Convert index to US/Eastern
+        df_h.index = df_h.index.tz_convert('US/Eastern')
+        
+        # Determine the cutoff: we only want to show data after the last DAILY close point
+        # to avoid messy overlaps.
+        if not df_plot.empty:
+            last_daily_date = pd.to_datetime(df_plot["Date"].iloc[-1]).replace(tzinfo=None)
+            last_daily_price = float(df_plot["Close_Flat"].iloc[-1])
             
-            # 只有當時間點不同時才拉線，否則只是重疊
-            if last_date_v != target_date_plot:
+            # Filter intraday data that is AFTER the last daily close
+            # Note: df_h index is localized, so we need to compare carefully
+            df_ext_plot = df_h[df_h.index.tz_localize(None) >= last_daily_date].copy()
+            
+            if not df_ext_plot.empty:
+                # Prepend the last daily close point for continuity
+                # We create a single-row DataFrame with the same columns as df_ext_plot
+                # and use the last_daily_date as the index.
+                # However, df_ext_plot.index is localized. So we localize last_daily_date too.
+                try:
+                    conn_idx = pd.Timestamp(last_daily_date).tz_localize('US/Eastern')
+                    df_conn = pd.DataFrame({'Close': [last_daily_price]}, index=[conn_idx])
+                    df_ext_plot = pd.concat([df_conn, df_ext_plot])
+                except:
+                    pass
+                
                 fig.add_trace(go.Scatter(
-                    x=[last_date_v, target_date_plot],
-                    y=[last_price_v, ext_price_plot],
+                    x=df_ext_plot.index, 
+                    y=df_ext_plot['Close'],
                     mode='lines',
-                    name='Ext-market Link',
-                    line=dict(color='#00ff00', width=2, dash='dot'),
+                    name=f'{ext_info["label"]}-market',
+                    line=dict(color='#80CF59', width=3, dash='dot'), # Match pre-market-text color
+                    hovertemplate="Price: $%{y:.2f}<br>Time: %{x}<extra></extra>"
+                ))
+                
+                # Also add a marker at the very end
+                fig.add_trace(go.Scatter(
+                    x=[df_ext_plot.index[-1]], 
+                    y=[df_ext_plot['Close'].iloc[-1]],
+                    mode='markers',
+                    name='Latest',
+                    marker=dict(color='#00ff00', size=10, symbol='diamond'),
                     showlegend=False
                 ))
 
