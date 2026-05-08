@@ -188,7 +188,8 @@ for ticker in all_tickers_list:
     except Exception:
         pass 
     
-    label = f"*{ticker}* {icon}"
+    display_name = f"{ticker}_" if ticker in ("NOK", "TTD") else ticker
+    label = f"*{display_name}* {icon}"
     if trend and trend != "ERROR":
         label += f" {trend}"
     
