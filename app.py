@@ -170,7 +170,10 @@ for ticker in all_tickers_list:
                 
                 if ext_s is not None and not ext_s.empty:
                     e_price = float(ext_s.iloc[-1])
-                    e_date = pd.to_datetime(ext_s.index[-1]).tz_convert('US/Eastern').replace(tzinfo=None)
+                    _raw_ts = pd.to_datetime(ext_s.index[-1])
+                    if _raw_ts.tzinfo is None:
+                        _raw_ts = _raw_ts.tz_localize('UTC')
+                    e_date = _raw_ts.tz_convert('America/New_York').replace(tzinfo=None)
                     
                     # 若盤前數據較新或屬於同一天，則採用之
                     if final_date is None or e_date.date() >= final_date.date():
@@ -244,10 +247,13 @@ def get_latest_price(ticker):
             info = t.info
             price = info.get('preMarketPrice') or info.get('postMarketPrice') or info.get('regularMarketPrice') or info.get('currentPrice')
             if price:
-                return {"price": float(price), "label": "Live", "time": pd.Timestamp.now(tz='US/Eastern')}
+                return {"price": float(price), "label": "Live", "time": pd.Timestamp.now(tz='America/New_York')}
             return None
 
-        last_ts = df_h.index[-1].tz_convert('US/Eastern')
+        # Guard: tz_convert requires tz-aware index; localize to UTC first if naive
+        if df_h.index.tzinfo is None:
+            df_h.index = df_h.index.tz_localize('UTC')
+        last_ts = df_h.index[-1].tz_convert('America/New_York')
         last_price = float(df_h['Close'].iloc[-1])
         
         hour = last_ts.hour
@@ -532,10 +538,10 @@ if is_ext_active and ext_info:
     if not df_h_raw.empty:
         try:
             df_h = df_h_raw.copy()
-            # Ensure index is timezone-aware and convert to US/Eastern
+            # Ensure index is timezone-aware and convert to America/New_York
             if df_h.index.tzinfo is None:
                 df_h.index = df_h.index.tz_localize('UTC')
-            df_h.index = df_h.index.tz_convert('US/Eastern')
+            df_h.index = df_h.index.tz_convert('America/New_York')
             
             # Extract Close column safely
             if isinstance(df_h.columns, pd.MultiIndex):
