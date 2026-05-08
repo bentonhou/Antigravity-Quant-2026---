@@ -27,6 +27,9 @@ STOCKS_CONFIG = {
     "ETN":  {"start": 326.29, "target": 485.0},
     "NOK":  {"start": 6.51,   "target": 8.50},
     "UMC":  {"start": 7.77,   "target": 13.00},
+    "HPE":  {"start": 19.24,  "target": 27.00},
+    "TTD":  {"start": 24.73,  "target": 46.00},
+    "INTC": {"start": 36.16,  "target": 55.00},
 }
 
 START_DATE = datetime(2026, 1, 1)
