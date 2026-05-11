@@ -30,6 +30,9 @@ STOCKS_CONFIG = {
     "HPE":  {"start": 19.24,  "target": 27.00},
     "TTD":  {"start": 24.73,  "target": 46.00},
     "INTC": {"start": 36.16,  "target": 55.00},
+    "NBIS": {"start": 100.45, "target": 210.00},
+    "CRWV": {"start": 71.61,  "target": 160.00},
+    "NOW":  {"start": 147.45, "target": 230.00},
 }
 
 START_DATE = datetime(2026, 1, 1)
