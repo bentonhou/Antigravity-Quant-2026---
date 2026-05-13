@@ -14,26 +14,27 @@ if ui_path not in sys.path:
     sys.path.append(ui_path)
 import ui_config# --- Configuration ---
 STOCKS_CONFIG = {
-    "TSM":  {"start": 319.61, "target": 435.0},
-    "NVDA": {"start": 187.20, "target": 270.0},
-    "AMD":  {"start": 214.30, "target": 290.0},
-    "MSFT": {"start": 472.94, "target": 590.0},
-    "GOOG": {"start": 315.32, "target": 360.0},
-    "QCOM": {"start": 173.00, "target": 155.0},
-    "AMZN": {"start": 237.21, "target": 285.0},
-    "AVGO": {"start": 347.62, "target": 475.0},
-    "MRVL": {"start": 89.39,  "target": 123.0},
-    "ANET": {"start": 133.60, "target": 235.0},
-    "ETN":  {"start": 326.29, "target": 485.0},
-    "NOK":  {"start": 6.51,   "target": 8.50},
-    "UMC":  {"start": 7.77,   "target": 13.00},
-    "HPE":  {"start": 19.24,  "target": 27.00},
-    "TTD":  {"start": 24.73,  "target": 46.00},
-    "INTC": {"start": 36.16,  "target": 55.00},
-    "NBIS": {"start": 100.45, "target": 210.00},
-    "CRWV": {"start": 71.61,  "target": 160.00},
-    "NOW":  {"start": 147.45, "target": 230.00},
-    "DELL": {"start": 114.44, "target": 185.00},
+    # Targets updated: 2026-05-13 (based on Wall Street analyst consensus)
+    "TSM":  {"start": 319.61, "target": 460.0},   # 舊:435 → 分析師共識 400-480
+    "NVDA": {"start": 187.20, "target": 275.0},   # 舊:270 → 分析師共識 270-280
+    "AMD":  {"start": 214.30, "target": 460.0},   # 舊:290 → 現價~461！分析師 390-420
+    "MSFT": {"start": 472.94, "target": 580.0},   # 舊:590 → 分析師共識 560-590
+    "GOOG": {"start": 315.32, "target": 410.0},   # 舊:360 → 分析師共識 360-425
+    "QCOM": {"start": 173.00, "target": 178.0},   # 舊:155 → 分析師共識 173-180
+    "AMZN": {"start": 237.21, "target": 315.0},   # 舊:285 → 分析師共識 312-318
+    "AVGO": {"start": 347.62, "target": 470.0},   # 舊:475 → 分析師共識 436-477
+    "MRVL": {"start": 89.39,  "target": 128.0},   # 舊:123 → 分析師共識 121-130
+    "ANET": {"start": 133.60, "target": 188.0},   # 舊:235 → 分析師共識 181-186
+    "ETN":  {"start": 326.29, "target": 455.0},   # 舊:485 → 分析師共識 420-470
+    "NOK":  {"start": 6.51,   "target": 10.0},    # 舊:8.50 → 分析師共識 9.70-10.30
+    "UMC":  {"start": 7.77,   "target": 8.50},    # 舊:13.00 → 分析師共識 7.40-8.60 (Bearish)
+    "HPE":  {"start": 19.24,  "target": 27.0},    # 維持，分析師共識 26-27
+    "TTD":  {"start": 24.73,  "target": 36.0},    # 舊:46 → 分析師共識 33-38
+    "INTC": {"start": 36.16,  "target": 120.0},   # 舊:55 → 現價~129！分析師 75-124
+    "NBIS": {"start": 100.45, "target": 170.0},   # 舊:210 → 分析師共識 159-174
+    "CRWV": {"start": 71.61,  "target": 135.0},   # 舊:160 → 分析師共識 131-133
+    "NOW":  {"start": 147.45, "target": 145.0},   # 舊:230 → 分割後共識 140-145 (5-for-1 split Dec 2025)
+    "DELL": {"start": 114.44, "target": 190.0},   # 舊:185 → 分析師共識 180-193
 }
 
 START_DATE = datetime(2026, 1, 1)
