@@ -7,6 +7,8 @@ import time
 import numpy as np
 import sys
 import os
+import json
+from datetime import date as date_cls
 
 # --- 設定字體與 UI 規範 ---
 ui_path = os.path.abspath(os.path.join("Standards", "fonts and UI"))
@@ -37,11 +39,45 @@ STOCKS_CONFIG = {
     "DELL": {"start": 114.44, "target": 190.0},   # 舊:185 → 分析師共識 180-193
 }
 
+# --- Target Price Meta File ---
+META_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "target_price_meta.json")
+
+def load_target_meta():
+    if os.path.exists(META_FILE):
+        with open(META_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {"last_updated": "2026-05-13", "next_update_allowed": "2026-09-01", "targets": {}}
+
+def save_target_meta(meta):
+    with open(META_FILE, "w", encoding="utf-8") as f:
+        json.dump(meta, f, indent=2, ensure_ascii=False)
+
+def get_next_update_allowed(from_date):
+    """Returns next quarterly date (Mar1/Jun1/Sep1/Dec1) at least 60 days away."""
+    min_date = from_date + timedelta(days=60)
+    for year_offset in [0, 1]:
+        year = from_date.year + year_offset
+        for month in [3, 6, 9, 12]:
+            candidate = date_cls(year, month, 1)
+            if candidate >= min_date:
+                return candidate
+    return date_cls(from_date.year + 1, 3, 1)
+
+# Apply saved targets to STOCKS_CONFIG
+_meta_init = load_target_meta()
+for _sym, _tgt in _meta_init.get("targets", {}).items():
+    if _sym in STOCKS_CONFIG:
+        STOCKS_CONFIG[_sym]["target"] = _tgt
+
 START_DATE = datetime(2026, 1, 1)
 END_DATE = datetime(2026, 12, 31)
 TOTAL_DAYS = (END_DATE - START_DATE).days + 1
 
 st.set_page_config(page_title="Antigravity Quant 2026", layout="wide")
+
+# --- Session State Init ---
+if "show_refresh_panel" not in st.session_state:
+    st.session_state.show_refresh_panel = False
 
 # 載入外部的 CSS 樣式
 def load_css(file_name):
@@ -80,6 +116,22 @@ def get_stock_data(ticker_or_tickers):
         return df
     except Exception as e:
         return pd.DataFrame()
+
+@st.cache_data(ttl=600)
+def fetch_yahoo_targets(tickers_tuple):
+    """Fetch analyst consensus target prices from Yahoo Finance."""
+    results = {}
+    for sym in tickers_tuple:
+        try:
+            info = yf.Ticker(sym).info
+            results[sym] = {
+                "mean":   info.get("targetMeanPrice"),
+                "high":   info.get("targetHighPrice"),
+                "low":    info.get("targetLowPrice"),
+            }
+        except Exception:
+            results[sym] = {"mean": None, "high": None, "low": None}
+    return results
 
 def calculate_status(ticker, price, date_obj, sentiment=1.0):
     # Re-implement baseline logic here for single point check
@@ -210,6 +262,31 @@ selected_ticker = sidebar_options[selected_display]
 auto_refresh = st.sidebar.checkbox("Auto-Refresh (60s)", value=True)
 debug_mode = st.sidebar.checkbox("Debug Mode", value=False)
 
+# --- Sidebar: Target Price Update ---
+st.sidebar.markdown("---")
+st.sidebar.markdown("<h2>目標價管理</h2>", unsafe_allow_html=True)
+_meta_sb = load_target_meta()
+_last_upd_str = _meta_sb.get("last_updated", "N/A")
+_next_upd_str = _meta_sb.get("next_update_allowed", "2026-09-01")
+try:
+    _next_upd_dt = datetime.strptime(_next_upd_str, "%Y-%m-%d").date()
+    _today_dt = datetime.now().date()
+    _can_update = _today_dt >= _next_upd_dt
+    _days_left = (_next_upd_dt - _today_dt).days
+except Exception:
+    _can_update = False
+    _days_left = 999
+if _can_update:
+    if st.sidebar.button("🔄 刷新目標價", key="btn_refresh_target", use_container_width=True):
+        fetch_yahoo_targets.clear()
+        st.session_state.show_refresh_panel = True
+else:
+    st.sidebar.button(
+        f"🔒 {_next_upd_str} 開放",
+        disabled=True, key="btn_refresh_locked", use_container_width=True
+    )
+    st.sidebar.caption(f"還有 {_days_left} 天｜上次更新：{_last_upd_str}")
+
 # --- Logic: Baseline ---
 config = STOCKS_CONFIG[selected_ticker]
 p_start = config["start"]
@@ -295,6 +372,55 @@ def get_ext_df(ticker):
 
 # --- Main Logic ---
 st.markdown(f"<h2>{selected_ticker} Wave Navigator</h2>", unsafe_allow_html=True)
+
+# --- Refresh Panel (shown when user clicks 刷新目標價) ---
+if st.session_state.get("show_refresh_panel", False):
+    st.markdown("---")
+    st.markdown("### 🔄 目標價刷新預覽")
+    st.info("以下為 Yahoo Finance 分析師共識目標價與目前設定值的比對。確認後將套用並鎖定至下一季度。")
+    with st.spinner("正在從 Yahoo Finance 抓取分析師目標價（約需 20 秒）..."):
+        _yahoo_data = fetch_yahoo_targets(tuple(all_tickers_list))
+    _rows = []
+    for _sym in all_tickers_list:
+        _cur_tgt = STOCKS_CONFIG[_sym]["target"]
+        _yd = _yahoo_data.get(_sym, {})
+        _mean = _yd.get("mean")
+        _high = _yd.get("high")
+        _low  = _yd.get("low")
+        _delta_str = f"{(_mean - _cur_tgt) / _cur_tgt * 100:+.1f}%" if _mean else "N/A"
+        _flag = "⚠️" if _mean and abs(_mean - _cur_tgt) / _cur_tgt > 0.15 else ""
+        _rows.append({
+            "代碼": _sym,
+            "目前目標": f"${_cur_tgt:.1f}",
+            "Yahoo 均值": f"${_mean:.1f}" if _mean else "N/A",
+            "Yahoo 最高": f"${_high:.1f}" if _high else "N/A",
+            "Yahoo 最低": f"${_low:.1f}"  if _low  else "N/A",
+            "變動幅度": f"{_flag} {_delta_str}".strip(),
+        })
+    st.dataframe(pd.DataFrame(_rows), use_container_width=True, hide_index=True)
+    _col1, _col2, _col3 = st.columns([1, 1, 2])
+    with _col1:
+        if st.button("✅ 套用 Yahoo 均值", key="btn_apply_mean", use_container_width=True):
+            _new_targets = {}
+            for _sym in all_tickers_list:
+                _mean_val = _yahoo_data.get(_sym, {}).get("mean")
+                _new_targets[_sym] = float(_mean_val) if _mean_val else STOCKS_CONFIG[_sym]["target"]
+            _today_dt2 = datetime.now().date()
+            _new_meta = {
+                "last_updated": _today_dt2.strftime("%Y-%m-%d"),
+                "next_update_allowed": get_next_update_allowed(_today_dt2).strftime("%Y-%m-%d"),
+                "targets": _new_targets,
+            }
+            save_target_meta(_new_meta)
+            st.session_state.show_refresh_panel = False
+            get_stock_data.clear()
+            st.success("✅ 目標價已更新！下次更新：" + _new_meta["next_update_allowed"])
+            st.rerun()
+    with _col2:
+        if st.button("❌ 取消", key="btn_cancel_refresh", use_container_width=True):
+            st.session_state.show_refresh_panel = False
+            st.rerun()
+    st.stop()
 
 # Re-fetch specific ticker to ensure we have full history for plotting
 with st.spinner(f"Loading chart for {selected_ticker}..."):
