@@ -104,6 +104,14 @@ sentiment_mapping = {
 }
 sentiment_factor = sentiment_mapping[sentiment_label]
 
+st.sidebar.markdown("<h2>起點錨定校正</h2>", unsafe_allow_html=True)
+start_blend_alpha = st.sidebar.slider(
+    "手動起點 ←混合比例→ Q4市場均價",
+    min_value=0.0, max_value=1.0, value=0.3, step=0.1,
+    format="%.1f",
+    help="1.0 = 完全使用手動設定值（目前行為）\n0.0 = 完全使用前年Q4實際均價（消除起點偏差）\n建議值：0.3（30%手動 + 70%市場錨點）"
+)
+
 
 # --- Helper: Data Fetching with Cache ---
 @st.cache_data(ttl=60) # Cache for 60 seconds
@@ -133,10 +141,35 @@ def fetch_yahoo_targets(tickers_tuple):
             results[sym] = {"mean": None, "high": None, "low": None}
     return results
 
-def calculate_status(ticker, price, date_obj, sentiment=1.0):
+@st.cache_data(ttl=86400)  # 歷史數據快取 24 小時（前年Q4不會再變動）
+def get_prev_q4_avg(tickers_tuple, base_year=2026):
+    """取前一年 Q4（10-12月）各股平均收盤價，作為年初基準起點的市場錨點。"""
+    prev_year = base_year - 1
+    q4_start  = f"{prev_year}-10-01"
+    q4_end    = f"{prev_year}-12-31"
+    results   = {}
+    try:
+        df = yf.download(" ".join(tickers_tuple), start=q4_start, end=q4_end,
+                         interval="1d", progress=False)
+        if df.empty:
+            return {t: None for t in tickers_tuple}
+        for ticker in tickers_tuple:
+            try:
+                if isinstance(df.columns, pd.MultiIndex):
+                    series = df['Close'][ticker].dropna()
+                else:
+                    series = df['Close'].dropna()
+                results[ticker] = float(series.mean()) if not series.empty else None
+            except Exception:
+                results[ticker] = None
+    except Exception:
+        results = {t: None for t in tickers_tuple}
+    return results
+
+def calculate_status(ticker, price, date_obj, sentiment=1.0, p_start_override=None):
     # Re-implement baseline logic here for single point check
     config = STOCKS_CONFIG[ticker]
-    p_start = config["start"]
+    p_start = p_start_override if p_start_override is not None else config["start"]
     p_target = config["target"] * sentiment # Apply Sentiment Adjustment
     slope = (p_target - p_start) / (TOTAL_DAYS - 1)
     
@@ -191,10 +224,16 @@ def calculate_trend(series, window=5):
 all_tickers_list = list(STOCKS_CONFIG.keys())
 sidebar_options = {}
 
+prev_q4_avg_data = {}  # 前年Q4均價初始化（起點錨點備援空字典）
 with st.spinner("Updating Market Signals..."):
     # 1. 抓取日線歷史數據
     df_all = get_stock_data(" ".join(all_tickers_list))
-    # 2. 抓取所有 Ticker 的最新分時數據 (含盤前盤後) - 使用 5d 確保能抓到最近的資料
+    # 2. 抓取前年 Q4（10-12月）均價，作為起點偏差校正的市場錨點（快取 24 小時）
+    try:
+        prev_q4_avg_data = get_prev_q4_avg(tuple(all_tickers_list))
+    except Exception:
+        prev_q4_avg_data = {}
+    # 3. 抓取所有 Ticker 的最新分時數據 (含盤前盤後) - 使用 5d 確保能抓到最近的資料
     try:
         df_ext_all = yf.download(" ".join(all_tickers_list), period='5d', interval='15m', prepost=True, progress=False)
     except:
@@ -239,8 +278,14 @@ for ticker in all_tickers_list:
             except:
                 pass
 
+        # 計算此 Ticker 的校正後起點（與主圖基準線邏輯一致）
+        _q4_ticker = prev_q4_avg_data.get(ticker)
+        _p_start_corr = None
+        if _q4_ticker is not None and start_blend_alpha < 1.0:
+            _p_start_corr = (1.0 - start_blend_alpha) * _q4_ticker + start_blend_alpha * STOCKS_CONFIG[ticker]["start"]
+
         if final_price is not None and final_date is not None:
-             icon = calculate_status(ticker, final_price, final_date, sentiment_factor)
+             icon = calculate_status(ticker, final_price, final_date, sentiment_factor, p_start_override=_p_start_corr)
              
     except Exception:
         pass 
@@ -289,7 +334,17 @@ else:
 
 # --- Logic: Baseline ---
 config = STOCKS_CONFIG[selected_ticker]
-p_start = config["start"]
+p_start_manual = config["start"]
+
+# --- 起點偏差校正：混合手動起點（主觀基準）與前年Q4市場均價（客觀錨點）---
+# 公式：p_start = (1 - alpha) × Q4均價 + alpha × 手動起點
+# alpha=1.0 → 完全使用手動起點（原始行為）
+# alpha=0.0 → 完全使用前年Q4均價（消除偏差）
+_q4_anchor = prev_q4_avg_data.get(selected_ticker)
+if _q4_anchor is not None and start_blend_alpha < 1.0:
+    p_start = (1.0 - start_blend_alpha) * _q4_anchor + start_blend_alpha * p_start_manual
+else:
+    p_start = p_start_manual  # 無Q4數據或 alpha=1 時，回退原始手動值
 
 # 1. Base Logic (Sentiment = 1.0)
 p_target_base = config["target"]
@@ -623,6 +678,12 @@ if debug_mode:
         st.sidebar.write("ext_info: `None`")
     st.sidebar.write(f"last_date: `{last_date}`")
     st.sidebar.write(f"current_price: `{current_price:.2f}`")
+    st.sidebar.markdown("**📐 起點校正**")
+    st.sidebar.write(f"手動起點 (p_start_manual): `{p_start_manual:.2f}`")
+    _q4_dbg = prev_q4_avg_data.get(selected_ticker)
+    st.sidebar.write(f"Q4均價錨點: `{_q4_dbg:.2f}`" if _q4_dbg else "Q4均價錨點: `N/A`")
+    st.sidebar.write(f"校正後起點 (p_start): `{p_start:.2f}`")
+    st.sidebar.write(f"混合比例 alpha: `{start_blend_alpha:.1f}`")
 
 # --- Visualization ---
 fig = go.Figure()
