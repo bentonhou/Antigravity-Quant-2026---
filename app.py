@@ -714,8 +714,31 @@ add_trace_pair(fig, df_base["Date"], df_base["Upper_37_5"], df_adj["Upper_37_5"]
 # +25% (Orange)
 add_trace_pair(fig, df_base["Date"], df_base["Upper_25"], df_adj["Upper_25"], "+25% (Reduce)", "rgb(255, 165, 0)", "dash")
 
+# --- Ghost Baseline (原始未校正基準線 fadeout，僅校正生效時顯示) ---
+# 將全年切為 N 段，opacity 從左端 0.55 線性遞減至右端 0.03，形成淡出效果
+if start_blend_alpha < 1.0 and _q4_anchor is not None and abs(p_start - p_start_manual) > 0.01:
+    _ghost_slope  = (p_target_base - p_start_manual) / (TOTAL_DAYS - 1)
+    _ghost_prices = [p_start_manual + _ghost_slope * i for i in range(TOTAL_DAYS)]
+    _N   = 15
+    _seg = TOTAL_DAYS // _N
+    for _i in range(_N):
+        _alpha = 0.55 - (0.55 - 0.03) * (_i / (_N - 1))   # 0.55 → 0.03
+        _s = _i * _seg
+        _e = (_s + _seg + 1) if _i < _N - 1 else TOTAL_DAYS
+        fig.add_trace(go.Scatter(
+            x=dates_2026[_s:_e],
+            y=_ghost_prices[_s:_e],
+            mode='lines',
+            name='Baseline (校正前)' if _i == 0 else None,
+            showlegend=(_i == 0),
+            legendgroup='ghost_baseline',
+            line=dict(color=f'rgba(210, 175, 100, {_alpha:.3f})', width=1.5, dash='dot'),
+            hoverinfo='skip'
+        ))
+
 # Baseline (Gray)
 add_trace_pair(fig, df_base["Date"], df_base["Baseline"], df_adj["Baseline"], "Baseline", "rgb(128, 128, 128)")
+
 
 # -10% (Green) - Lowest
 add_trace_pair(fig, df_base["Date"], df_base["Lower_10"], df_adj["Lower_10"], "-10% (Buy)", "rgb(0, 128, 0)", "dash")
