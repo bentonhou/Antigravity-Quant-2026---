@@ -105,12 +105,14 @@ sentiment_mapping = {
 sentiment_factor = sentiment_mapping[sentiment_label]
 
 st.sidebar.markdown("<h2>起點錨定校正</h2>", unsafe_allow_html=True)
-start_blend_alpha = st.sidebar.slider(
-    "手動起點 ←混合比例→ Q4市場均價",
-    min_value=0.0, max_value=1.0, value=0.3, step=0.1,
-    format="%.1f",
-    help="1.0 = 完全使用手動設定值（目前行為）\n0.0 = 完全使用前年Q4實際均價（消除起點偏差）\n建議值：0.3（30%手動 + 70%市場錨點）"
+_blend_label = st.sidebar.select_slider(
+    "起點錨定校正",
+    options=["Q4均價 (0.0)", "混合 (0.5)", "手動起點 (1.0)"],
+    value="混合 (0.5)",
+    label_visibility="collapsed"
 )
+_blend_mapping = {"Q4均價 (0.0)": 0.0, "混合 (0.5)": 0.5, "手動起點 (1.0)": 1.0}
+start_blend_alpha = _blend_mapping[_blend_label]
 
 
 # --- Helper: Data Fetching with Cache ---
