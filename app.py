@@ -520,6 +520,15 @@ if not df_real.empty:
     df_plot['Close_Flat'] = y_data_series
     df_plot = df_plot.reset_index()
 
+    # Normalize the date column name — yfinance may call it 'Date', 'Datetime', 'Price', etc.
+    if 'Date' not in df_plot.columns:
+        # Find first column whose values look like datetimes, or just use the first column
+        _date_col = next(
+            (c for c in df_plot.columns if pd.api.types.is_datetime64_any_dtype(df_plot[c])),
+            df_plot.columns[0]
+        )
+        df_plot.rename(columns={_date_col: 'Date'}, inplace=True)
+
     # Find the last row with a valid price to avoid TypeError during float conversion
     subset_col = 'Close_Flat' if 'Close_Flat' in df_plot.columns else df_plot.columns[-1]
     df_valid = df_plot.dropna(subset=[subset_col])
@@ -546,7 +555,7 @@ if not df_real.empty:
     else:
         # Fallback if no valid price data exists
         last_row = df_plot.iloc[-1]
-        last_date = pd.to_datetime(last_row['Date'])
+        last_date = pd.to_datetime(last_row.get('Date', last_row.iloc[0]))
         if isinstance(last_date, pd.Series):
             last_date = last_date.iloc[0]
         
