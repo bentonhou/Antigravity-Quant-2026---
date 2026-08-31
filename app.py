@@ -37,6 +37,8 @@ STOCKS_CONFIG = {
     "CRWV": {"start": 71.61,  "target": 135.0},   # 舊:160 → 分析師共識 131-133
     "NOW":  {"start": 147.45, "target": 145.0},   # 舊:230 → 分割後共識 140-145 (5-for-1 split Dec 2025)
     "DELL": {"start": 114.44, "target": 190.0},   # 舊:185 → 分析師共識 180-193
+    "CRM":  {"start": 253.62, "target": 261.0},
+    "CRWD": {"start": 117.19, "target": 227.0},
 }
 
 # --- Target Price Meta File ---
