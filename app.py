@@ -319,7 +319,7 @@ _last_upd_str = _meta_sb.get("last_updated", "N/A")
 _next_upd_str = _meta_sb.get("next_update_allowed", "2026-09-01")
 try:
     _next_upd_dt = datetime.strptime(_next_upd_str, "%Y-%m-%d").date()
-    _today_dt = datetime.now().date()
+    _today_dt = pd.Timestamp.now(tz='Asia/Taipei').date()
     _can_update = _today_dt >= _next_upd_dt
     _days_left = (_next_upd_dt - _today_dt).days
 except Exception:
@@ -464,7 +464,7 @@ if st.session_state.get("show_refresh_panel", False):
             for _sym in all_tickers_list:
                 _mean_val = _yahoo_data.get(_sym, {}).get("mean")
                 _new_targets[_sym] = float(_mean_val) if _mean_val else STOCKS_CONFIG[_sym]["target"]
-            _today_dt2 = datetime.now().date()
+            _today_dt2 = pd.Timestamp.now(tz='Asia/Taipei').date()
             _new_meta = {
                 "last_updated": _today_dt2.strftime("%Y-%m-%d"),
                 "next_update_allowed": get_next_update_allowed(_today_dt2).strftime("%Y-%m-%d"),
