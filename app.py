@@ -14,31 +14,38 @@ from datetime import date as date_cls
 ui_path = os.path.abspath(os.path.join("Standards", "fonts and UI"))
 if ui_path not in sys.path:
     sys.path.append(ui_path)
-import ui_config# --- Configuration ---
+import ui_config
+from concurrent.futures import ThreadPoolExecutor
+
+# --- Configuration ---
 STOCKS_CONFIG = {
-    # Targets updated: 2026-05-13 (based on Wall Street analyst consensus)
-    "TSM":  {"start": 319.61, "target": 460.0},   # 舊:435 → 分析師共識 400-480
-    "NVDA": {"start": 187.20, "target": 275.0},   # 舊:270 → 分析師共識 270-280
-    "AMD":  {"start": 214.30, "target": 460.0},   # 舊:290 → 現價~461！分析師 390-420
-    "MSFT": {"start": 472.94, "target": 580.0},   # 舊:590 → 分析師共識 560-590
-    "GOOG": {"start": 315.32, "target": 410.0},   # 舊:360 → 分析師共識 360-425
-    "QCOM": {"start": 173.00, "target": 178.0},   # 舊:155 → 分析師共識 173-180
-    "AMZN": {"start": 237.21, "target": 315.0},   # 舊:285 → 分析師共識 312-318
-    "AVGO": {"start": 347.62, "target": 470.0},   # 舊:475 → 分析師共識 436-477
-    "MRVL": {"start": 89.39,  "target": 128.0},   # 舊:123 → 分析師共識 121-130
-    "ANET": {"start": 133.60, "target": 188.0},   # 舊:235 → 分析師共識 181-186
-    "ETN":  {"start": 326.29, "target": 455.0},   # 舊:485 → 分析師共識 420-470
-    "NOK":  {"start": 6.51,   "target": 10.0},    # 舊:8.50 → 分析師共識 9.70-10.30
-    "UMC":  {"start": 7.77,   "target": 8.50},    # 舊:13.00 → 分析師共識 7.40-8.60 (Bearish)
-    "HPE":  {"start": 19.24,  "target": 27.0},    # 維持，分析師共識 26-27
-    "TTD":  {"start": 24.73,  "target": 36.0},    # 舊:46 → 分析師共識 33-38
-    "INTC": {"start": 36.16,  "target": 120.0},   # 舊:55 → 現價~129！分析師 75-124
-    "NBIS": {"start": 100.45, "target": 170.0},   # 舊:210 → 分析師共識 159-174
-    "CRWV": {"start": 71.61,  "target": 135.0},   # 舊:160 → 分析師共識 131-133
-    "NOW":  {"start": 147.45, "target": 145.0},   # 舊:230 → 分割後共識 140-145 (5-for-1 split Dec 2025)
-    "DELL": {"start": 114.44, "target": 190.0},   # 舊:185 → 分析師共識 180-193
-    "CRM":  {"start": 253.62, "target": 261.0},
-    "CRWD": {"start": 117.19, "target": 227.0},
+    # Targets updated: 2026-09-07 (based on Wall Street analyst consensus)
+    "TSM":  {"start": 319.61, "target": 552.4},
+    "NVDA": {"start": 187.20, "target": 327.1},
+    "AMD":  {"start": 214.30, "target": 613.8},
+    "MSFT": {"start": 472.94, "target": 572.9},
+    "GOOG": {"start": 315.32, "target": 422.3},
+    "QCOM": {"start": 173.00, "target": 193.9},
+    "AMZN": {"start": 237.21, "target": 328.2},
+    "AVGO": {"start": 347.62, "target": 533.4},
+    "MRVL": {"start": 89.39,  "target": 285.0},
+    "ANET": {"start": 133.60, "target": 241.0},
+    "ETN":  {"start": 326.29, "target": 475.6},
+    "NOK":  {"start": 6.51,   "target": 15.0},
+    "UMC":  {"start": 7.77,   "target": 18.5},
+    "HPE":  {"start": 19.24,  "target": 67.8},
+    "TTD":  {"start": 24.73,  "target": 13.6},
+    "INTC": {"start": 36.16,  "target": 115.8},
+    "NBIS": {"start": 100.45, "target": 286.7},
+    "CRWV": {"start": 71.61,  "target": 144.5},
+    "NOW":  {"start": 147.45, "target": 141.8},
+    "DELL": {"start": 114.44, "target": 564.5},
+    "CRM":  {"start": 253.62, "target": 272.1},
+    "CRWD": {"start": 117.19, "target": 231.5},
+    "GLW":  {"start": 90.19,  "target": 191.4},
+    "MRK":  {"start": 104.91, "target": 149.5},
+    "MU":   {"start": 315.24, "target": 1513.1},
+    "SNDK": {"start": 275.24, "target": 2125.1},
 }
 
 # --- Target Price Meta File ---
@@ -48,7 +55,7 @@ def load_target_meta():
     if os.path.exists(META_FILE):
         with open(META_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    return {"last_updated": "2026-05-13", "next_update_allowed": "2026-09-01", "targets": {}}
+    return {"last_updated": "2026-09-07", "next_update_allowed": "2026-12-01", "targets": {}}
 
 def save_target_meta(meta):
     with open(META_FILE, "w", encoding="utf-8") as f:
@@ -131,18 +138,20 @@ def get_stock_data(ticker_or_tickers):
 
 @st.cache_data(ttl=600)
 def fetch_yahoo_targets(tickers_tuple):
-    """Fetch analyst consensus target prices from Yahoo Finance."""
-    results = {}
-    for sym in tickers_tuple:
+    """Fetch analyst consensus target prices from Yahoo Finance in parallel."""
+    def _fetch_one(sym):
         try:
             info = yf.Ticker(sym).info
-            results[sym] = {
+            return sym, {
                 "mean":   info.get("targetMeanPrice"),
                 "high":   info.get("targetHighPrice"),
                 "low":    info.get("targetLowPrice"),
             }
         except Exception:
-            results[sym] = {"mean": None, "high": None, "low": None}
+            return sym, {"mean": None, "high": None, "low": None}
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        results = dict(list(ex.map(_fetch_one, tickers_tuple)))
     return results
 
 @st.cache_data(ttl=86400)  # 歷史數據快取 24 小時（前年Q4不會再變動）
@@ -316,7 +325,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("<h2>目標價管理</h2>", unsafe_allow_html=True)
 _meta_sb = load_target_meta()
 _last_upd_str = _meta_sb.get("last_updated", "N/A")
-_next_upd_str = _meta_sb.get("next_update_allowed", "2026-09-01")
+_next_upd_str = _meta_sb.get("next_update_allowed", "2026-12-01")
 try:
     _next_upd_dt = datetime.strptime(_next_upd_str, "%Y-%m-%d").date()
     _today_dt = pd.Timestamp.now(tz='Asia/Taipei').date()
@@ -432,12 +441,15 @@ def get_ext_df(ticker):
 # --- Main Logic ---
 st.markdown(f"<h2>{selected_ticker} Wave Navigator</h2>", unsafe_allow_html=True)
 
+if "target_update_msg" in st.session_state:
+    st.success(st.session_state.pop("target_update_msg"))
+
 # --- Refresh Panel (shown when user clicks 刷新目標價) ---
 if st.session_state.get("show_refresh_panel", False):
     st.markdown("---")
     st.markdown("### 🔄 目標價刷新預覽")
     st.info("以下為 Yahoo Finance 分析師共識目標價與目前設定值的比對。確認後將套用並鎖定至下一季度。")
-    with st.spinner("正在從 Yahoo Finance 抓取分析師目標價（約需 20 秒）..."):
+    with st.spinner("正在從 Yahoo Finance 抓取分析師目標價..."):
         _yahoo_data = fetch_yahoo_targets(tuple(all_tickers_list))
     _rows = []
     for _sym in all_tickers_list:
@@ -463,17 +475,22 @@ if st.session_state.get("show_refresh_panel", False):
             _new_targets = {}
             for _sym in all_tickers_list:
                 _mean_val = _yahoo_data.get(_sym, {}).get("mean")
-                _new_targets[_sym] = float(_mean_val) if _mean_val else STOCKS_CONFIG[_sym]["target"]
+                _new_targets[_sym] = round(float(_mean_val), 1) if _mean_val else STOCKS_CONFIG[_sym]["target"]
             _today_dt2 = pd.Timestamp.now(tz='Asia/Taipei').date()
+            _next_allowed_dt = get_next_update_allowed(_today_dt2)
             _new_meta = {
                 "last_updated": _today_dt2.strftime("%Y-%m-%d"),
-                "next_update_allowed": get_next_update_allowed(_today_dt2).strftime("%Y-%m-%d"),
+                "next_update_allowed": _next_allowed_dt.strftime("%Y-%m-%d"),
                 "targets": _new_targets,
             }
             save_target_meta(_new_meta)
+            for _s, _v in _new_targets.items():
+                if _s in STOCKS_CONFIG:
+                    STOCKS_CONFIG[_s]["target"] = _v
             st.session_state.show_refresh_panel = False
+            st.session_state["target_update_msg"] = f"✅ 目標價已成功更新並鎖定！下次開放更新時間：{_new_meta['next_update_allowed']}"
             get_stock_data.clear()
-            st.success("✅ 目標價已更新！下次更新：" + _new_meta["next_update_allowed"])
+            fetch_yahoo_targets.clear()
             st.rerun()
     with _col2:
         if st.button("❌ 取消", key="btn_cancel_refresh", use_container_width=True):
