@@ -234,12 +234,12 @@ def calculate_trend(series, window=5):
 
 # --- Asset Categories Definition ---
 ASSET_CATEGORIES = {
-    "① Energy": ["ETN"],
-    "② Chips": ["NVDA", "AMD", "AVGO", "MRVL", "QCOM", "INTC", "TSM", "UMC", "MU", "SNDK"],
-    "③ Compute Infrastructure": ["ANET", "NOK", "DELL", "HPE", "GLW"],
-    "④ AI Factory / Cloud": ["CRWV", "NBIS"],
-    "⑤ Models / AI Platforms": ["MSFT", "GOOG", "AMZN"],
-    "⑥ Applications": ["NOW", "CRM", "CRWD", "TTD", "MRK"],
+    "Energy": ["ETN"],
+    "Chips": ["NVDA", "AMD", "AVGO", "MRVL", "QCOM", "INTC", "TSM", "UMC", "MU", "SNDK"],
+    "Compute Infrastructure": ["ANET", "NOK", "DELL", "HPE", "GLW"],
+    "AI Factory / Cloud": ["CRWV", "NBIS"],
+    "Models / AI Platforms": ["MSFT", "GOOG", "AMZN"],
+    "Applications": ["NOW", "CRM", "CRWD", "TTD", "MRK"],
 }
 
 # --- Sidebar Preparation ---
@@ -346,23 +346,24 @@ def _on_category_radio_change(cat_key):
                 st.session_state[f"radio_{_other_cat}"] = None
 
 for cat_name, cat_tickers in ASSET_CATEGORIES.items():
-    st.sidebar.markdown(
-        f'<div class="asset-category-header">{cat_name}</div><hr class="asset-category-divider">',
-        unsafe_allow_html=True
-    )
-    cat_labels = [ticker_to_label[t] for t in cat_tickers if t in ticker_to_label]
-    cur_label = ticker_to_label.get(st.session_state.selected_ticker)
-    cat_idx = cat_labels.index(cur_label) if cur_label in cat_labels else None
+    with st.sidebar.container(border=True):
+        st.markdown(
+            f'<div class="asset-card-title">{cat_name}</div>',
+            unsafe_allow_html=True
+        )
+        cat_labels = [ticker_to_label[t] for t in cat_tickers if t in ticker_to_label]
+        cur_label = ticker_to_label.get(st.session_state.selected_ticker)
+        cat_idx = cat_labels.index(cur_label) if cur_label in cat_labels else None
 
-    st.sidebar.radio(
-        cat_name,
-        cat_labels,
-        index=cat_idx,
-        key=f"radio_{cat_name}",
-        on_change=_on_category_radio_change,
-        args=(cat_name,),
-        label_visibility="collapsed"
-    )
+        st.radio(
+            cat_name,
+            cat_labels,
+            index=cat_idx,
+            key=f"radio_{cat_name}",
+            on_change=_on_category_radio_change,
+            args=(cat_name,),
+            label_visibility="collapsed"
+        )
 
 selected_ticker = st.session_state.selected_ticker
 
