@@ -232,10 +232,30 @@ def calculate_trend(series, window=5):
         # Fallback to simple diff
         return "↗" if y[-1] >= y[0] else "↘"
 
+# --- Asset Categories Definition ---
+ASSET_CATEGORIES = {
+    "① Energy": ["ETN"],
+    "② Chips": ["NVDA", "AMD", "AVGO", "MRVL", "QCOM", "INTC", "TSM", "UMC", "MU", "SNDK"],
+    "③ Compute Infrastructure": ["ANET", "NOK", "DELL", "HPE", "GLW"],
+    "④ AI Factory / Cloud": ["CRWV", "NBIS"],
+    "⑤ Models / AI Platforms": ["MSFT", "GOOG", "AMZN"],
+    "⑥ Applications": ["NOW", "CRM", "CRWD", "TTD", "MRK"],
+}
+
 # --- Sidebar Preparation ---
 
-all_tickers_list = list(STOCKS_CONFIG.keys())
+# Flatten categories in structured order
+all_tickers_list = []
+for _cat_tickers in ASSET_CATEGORIES.values():
+    for _t in _cat_tickers:
+        if _t in STOCKS_CONFIG and _t not in all_tickers_list:
+            all_tickers_list.append(_t)
+for _t in STOCKS_CONFIG:
+    if _t not in all_tickers_list:
+        all_tickers_list.append(_t)
+
 sidebar_options = {}
+ticker_to_label = {}
 
 prev_q4_avg_data = {}  # 前年Q4均價初始化（起點錨點備援空字典）
 with st.spinner("Updating Market Signals..."):
@@ -309,13 +329,42 @@ for ticker in all_tickers_list:
         label += f" {trend}"
     
     sidebar_options[label] = ticker
+    ticker_to_label[ticker] = label
 
-# --- Sidebar ---
+# --- Sidebar: Asset Selection with Subheadings ---
 st.sidebar.markdown("<h2>Asset Selection</h2>", unsafe_allow_html=True)
-# Create reverse mapping or just use keys
-display_keys = list(sidebar_options.keys())
-selected_display = st.sidebar.radio("Ticker", display_keys, label_visibility="collapsed")
-selected_ticker = sidebar_options[selected_display]
+
+if "selected_ticker" not in st.session_state or st.session_state.selected_ticker not in STOCKS_CONFIG:
+    st.session_state.selected_ticker = "TSM"
+
+def _on_category_radio_change(cat_key):
+    _chosen_lbl = st.session_state.get(f"radio_{cat_key}")
+    if _chosen_lbl and _chosen_lbl in sidebar_options:
+        st.session_state.selected_ticker = sidebar_options[_chosen_lbl]
+        for _other_cat in ASSET_CATEGORIES:
+            if _other_cat != cat_key:
+                st.session_state[f"radio_{_other_cat}"] = None
+
+for cat_name, cat_tickers in ASSET_CATEGORIES.items():
+    st.sidebar.markdown(
+        f'<div class="asset-category-header">{cat_name}</div><hr class="asset-category-divider">',
+        unsafe_allow_html=True
+    )
+    cat_labels = [ticker_to_label[t] for t in cat_tickers if t in ticker_to_label]
+    cur_label = ticker_to_label.get(st.session_state.selected_ticker)
+    cat_idx = cat_labels.index(cur_label) if cur_label in cat_labels else None
+
+    st.sidebar.radio(
+        cat_name,
+        cat_labels,
+        index=cat_idx,
+        key=f"radio_{cat_name}",
+        on_change=_on_category_radio_change,
+        args=(cat_name,),
+        label_visibility="collapsed"
+    )
+
+selected_ticker = st.session_state.selected_ticker
 
 auto_refresh = st.sidebar.checkbox("Auto-Refresh (60s)", value=True)
 debug_mode = st.sidebar.checkbox("Debug Mode", value=False)
