@@ -348,7 +348,7 @@ def _on_category_radio_change(cat_key):
 for cat_name, cat_tickers in ASSET_CATEGORIES.items():
     with st.sidebar.container(border=True):
         st.markdown(
-            f'<div class="asset-card-title">{cat_name}</div>',
+            f'<div class="asset-card-title" style="color: #FF9800 !important; font-size: 11px !important; font-weight: 400 !important; text-align: right !important; width: 100% !important; margin: 0 0 2px 0 !important; line-height: 1.2 !important; letter-spacing: 0.5px !important;">{cat_name}</div>',
             unsafe_allow_html=True
         )
         cat_labels = [ticker_to_label[t] for t in cat_tickers if t in ticker_to_label]
