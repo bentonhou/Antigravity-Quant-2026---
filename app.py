@@ -347,9 +347,19 @@ def _on_category_radio_change(cat_key):
 
 for cat_name, cat_tickers in ASSET_CATEGORIES.items():
     with st.sidebar.container(border=True):
+        cat_id = cat_name.replace(" ", "_").replace("/", "_")
         st.markdown(
-            f'<div style="display: flex; justify-content: flex-end; align-items: center; width: 100%; margin: 0 0 2px 0; padding: 0;">'
-            f'<span class="asset-card-title" style="color: #FF9800 !important; font-size: 6px !important; font-weight: 200 !important; letter-spacing: 0.5px !important; line-height: 1.2 !important; text-align: right !important;">{cat_name}</span>'
+            f'<style>'
+            f'#cat-title-{cat_id} {{'
+            f'  color: #FF9800 !important;'
+            f'  font-size: 6px !important;'
+            f'  font-weight: 200 !important;'
+            f'  letter-spacing: 0.5px !important;'
+            f'  line-height: 1.2 !important;'
+            f'}}'
+            f'</style>'
+            f'<div style="display: flex; justify-content: flex-end; width: 100%; margin: 0 0 2px 0; padding: 0;">'
+            f'<span id="cat-title-{cat_id}" class="asset-card-title">{cat_name}</span>'
             f'</div>',
             unsafe_allow_html=True
         )
