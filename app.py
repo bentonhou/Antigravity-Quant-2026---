@@ -350,9 +350,10 @@ for cat_name, cat_tickers in ASSET_CATEGORIES.items():
         cat_id = cat_name.replace(" ", "_").replace("/", "_")
         st.markdown(
             f'<style>'
-            f'#cat-title-{cat_id} {{'
+            f'#cat-title-{cat_id}#cat-title-{cat_id} {{'
             f'  color: #FF9800 !important;'
-            f'  font-size: 6px !important;'
+            f'  -webkit-text-fill-color: #FF9800 !important;'
+            f'  font-size: 10px !important;'
             f'  font-weight: 200 !important;'
             f'  letter-spacing: 0.5px !important;'
             f'  line-height: 1.2 !important;'

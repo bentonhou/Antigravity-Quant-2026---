@@ -153,7 +153,8 @@ div[class^="stSidebar"] > div[class^="resize-tr"] { display: none !important; }
 [data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stMarkdownContainer"] span.asset-card-title,
 [data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stMarkdownContainer"] p span.asset-card-title {
     color: #FF9800 !important; /* 與 Asset Selection 顏色一致之橘黃色 */
-    font-size: 6px !important; /* 6px */
+    -webkit-text-fill-color: #FF9800 !important; /* 覆蓋 Streamlit 深色主題強制注入 */
+    font-size: 10px !important; /* 10px */
     font-weight: 200 !important; /* weight 200 細體 */
     text-align: right !important; /* 置於右上 */
     line-height: 1.2 !important;
