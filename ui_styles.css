@@ -125,25 +125,70 @@ div[class^="stSidebar"] > div[class^="resize-tr"] { display: none !important; }
     margin-top: 36px !important; /* H1 兩端水平對齊 */
 }
 
-/* Asset Selection Subheadings & Dividers */
-.asset-category-header {
-    color: #FF9800 !important; /* 與 Asset Selection 顏色一致 */
-    font-size: 16px !important; /* 比 Asset Selection(22px) 小一級 */
-    font-weight: bold !important;
-    margin-top: 14px !important;
-    margin-bottom: 2px !important;
-    letter-spacing: 0.5px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+/* Sidebar Asset Category Card Styling */
+[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] {
+    margin-bottom: 8px !important;
 }
 
-.asset-category-divider {
-    border: none !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.2) !important; /* 區隔上下的水平橫線 */
-    margin-top: 3px !important;
-    margin-bottom: 6px !important;
-    width: 100% !important;
+[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] > div {
+    background-color: #1f1f23 !important; /* 精緻深色卡片底色，與 sidebar #18181b 形成微妙層次 */
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 8px !important;
+    padding: 6px 10px 4px 10px !important; /* 緊湊上下內距，徹底消除 Energy 底部過大問題 */
+    transition: border-color 0.2s ease;
+}
+
+[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] > div:hover {
+    border-color: rgba(255, 255, 255, 0.22) !important;
+}
+
+/* 消除卡片內部垂直容器的預設 1rem gap */
+[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVerticalBlock"] {
+    gap: 0px !important;
+}
+
+/* Card Title (子標題：置於右上、橘黃色、大小 6px、細體 weight 200) */
+.asset-card-title,
+[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] .asset-card-title,
+[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stMarkdownContainer"] span.asset-card-title,
+[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stMarkdownContainer"] p span.asset-card-title {
+    color: #FF9800 !important; /* 與 Asset Selection 顏色一致之橘黃色 */
+    font-size: 6px !important; /* 6px */
+    font-weight: 200 !important; /* weight 200 細體 */
+    text-align: right !important; /* 置於右上 */
+    line-height: 1.2 !important;
+    letter-spacing: 0.5px !important;
+}
+
+/* 確保第一個 element-container (標題區) 緊貼右上且無多餘邊距 */
+[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] div[data-testid="element-container"]:first-child {
+    margin: 0px !important;
+    padding: 0px !important;
+}
+
+/* 消除 Markdown 容器預設下邊距與置中影響 */
+[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stMarkdownContainer"] p {
+    margin: 0px !important;
+    padding: 0px !important;
+    text-align: right !important;
+}
+
+/* Radio inside Category Card：完全清除上下多餘邊距與內距 */
+[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stRadio"],
+[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] div[data-testid="stRadio"] {
+    margin: 0px !important;
+    padding: 0px !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] div[role="radiogroup"] {
+    margin: 0px !important;
+    padding: 0px !important;
+    gap: 3px !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] label[data-baseweb="radio"] {
+    margin-bottom: 0px !important;
+    padding-bottom: 0px !important;
 }
 
 /* Radio Button Ticker Formatting (List split by virtual vertical segment) */
