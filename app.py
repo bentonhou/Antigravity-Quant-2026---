@@ -95,6 +95,46 @@ def load_css(file_name):
 
 load_css(os.path.join(ui_path, "ui_styles.css"))
 
+# 直接注入 sidebar radio 樣式，避免外部 CSS 快取問題
+st.markdown("""
+<style>
+/* Radio Button 整行：14px bold flex */
+[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p {
+    color: #ffffff;
+    font-size: 14px !important;
+    font-weight: bold !important;
+    display: flex !important;
+    align-items: center !important;
+}
+/* Ticker 名稱 em 欄位 */
+[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p em {
+    font-style: normal !important;
+    display: inline-block !important;
+    width: 55px !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.4) !important;
+    margin-right: 12px !important;
+    padding-right: 8px !important;
+    font-weight: bold !important;
+    color: #ffffff !important;
+}
+/* 所有 span 防止換行 */
+[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p span,
+[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p span span {
+    white-space: nowrap !important;
+}
+/* Deviation <strong>：標準粗細、14px */
+[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] strong {
+    font-size: 14px !important;
+    font-weight: normal !important;
+    white-space: nowrap !important;
+}
+/* 點選圈圈：縮小並垂直置中 */
+[data-testid="stSidebar"] [data-testid="stRadio"] label[data-baseweb="radio"] > div:first-child {
+    transform: scale(0.8) translateY(-3px) !important;
+    transform-origin: center !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 st.markdown("<h1>Antigravity Quant 2026 - 波段導航儀</h1>", unsafe_allow_html=True)
 
