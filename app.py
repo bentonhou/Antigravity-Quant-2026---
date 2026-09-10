@@ -95,6 +95,7 @@ def load_css(file_name):
 
 load_css(os.path.join(ui_path, "ui_styles.css"))
 
+
 st.markdown("<h1>Antigravity Quant 2026 - 波段導航儀</h1>", unsafe_allow_html=True)
 
 # --- Sidebar Global Settings (Placed early for data dependency) ---
@@ -346,14 +347,15 @@ for ticker in all_tickers_list:
     # Append Deviation % with color matching right-side metric card
     # 使用 thin-space (\u2009) 在箭頭與 Deviation 間建立明確間距（不溢出 sidebar）
     if _sb_dev_pct is not None:
+        _dev_sep = "\u2002\u2002"  # 2× en-space：箭頭與 Deviation 間的明確間距
         if _sb_dev_pct <= -10:
-            label += f" :green[**{_sb_dev_pct:+.1f}%**]"
+            label += f"{_dev_sep}:green[**{_sb_dev_pct:+.1f}%**]"
         elif _sb_dev_pct >= 37.5:
-            label += f" :red[**{_sb_dev_pct:+.1f}%**]"
+            label += f"{_dev_sep}:red[**{_sb_dev_pct:+.1f}%**]"
         elif _sb_dev_pct >= 25:
-            label += f" :orange[**{_sb_dev_pct:+.1f}%**]"
+            label += f"{_dev_sep}:orange[**{_sb_dev_pct:+.1f}%**]"
         else:
-            label += f" :gray[**{_sb_dev_pct:+.1f}%**]"
+            label += f"{_dev_sep}:gray[**{_sb_dev_pct:+.1f}%**]"
     
     sidebar_options[label] = ticker
     ticker_to_label[ticker] = label
