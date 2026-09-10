@@ -192,11 +192,17 @@ div[class^="stSidebar"] > div[class^="resize-tr"] { display: none !important; }
     padding-bottom: 0px !important;
 }
 
+/* 點選圈圈縮小：配合 14px 字體等比縮放，translateY 補正偏移 */
+[data-testid="stSidebar"] [data-testid="stRadio"] label[data-baseweb="radio"] > div:first-child {
+    transform: scale(0.8) translateY(-3px) !important;
+    transform-origin: center !important;
+}
+
 /* Radio Button Ticker Formatting (List split by virtual vertical segment) */
 [data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p em {
     font-style: normal !important;
     display: inline-block;
-    width: 65px; /* 回調寬度：相較於 36px，16px 的字只需較小的固定寬度來畫分隔線 */
+    width: 55px; /* 配合 14px 字體縮減寬度 */
     border-right: 1px solid rgba(255, 255, 255, 0.4) !important; /* 分隔線 */
     margin-right: 12px;
     padding-right: 8px;
@@ -207,7 +213,7 @@ div[class^="stSidebar"] > div[class^="resize-tr"] { display: none !important; }
 /* Radio Button typography style (Ticker List) */
 [data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p {
     color: #ffffff;
-    font-size: 16px !important;
+    font-size: 14px !important;
     font-weight: bold !important;
     display: flex; /* 保持跟原生點擊圓圈良好垂直置中 */
     align-items: center;
@@ -225,8 +231,8 @@ div[class^="stSidebar"] > div[class^="resize-tr"] { display: none !important; }
     font-weight: normal !important;
 }
 
-/* Deviation 靠右對齊：讓包含 <strong> 的 span 推到 flex 右端 */
-[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p span:has(strong) {
+/* Deviation 靠右對齊：flex 容器內最後一個 span 推到右端 */
+[data-testid="stSidebar"] [data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p > span:last-child {
     margin-left: auto !important;
 }
 
