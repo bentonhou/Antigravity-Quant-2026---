@@ -219,11 +219,14 @@ div[class^="stSidebar"] > div[class^="resize-tr"] { display: none !important; }
     white-space: nowrap !important;
 }
 
-/* Deviation %（最後一個 span）：標準粗細、14px、靠右對齊 */
-[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p > span:last-of-type,
-[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p > span:last-of-type span {
+/* Deviation %（:color[**text**] 產生的 <strong>）：標準粗細、14px */
+[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] strong {
     font-size: 14px !important;
     font-weight: normal !important;
+}
+
+/* Deviation 靠右對齊：讓包含 <strong> 的 span 推到 flex 右端 */
+[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p span:has(strong) {
     margin-left: auto !important;
 }
 

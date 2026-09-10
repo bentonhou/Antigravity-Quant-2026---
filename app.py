@@ -346,15 +346,14 @@ for ticker in all_tickers_list:
     # Append Deviation % with color matching right-side metric card
     # 使用 thin-space (\u2009) 在箭頭與 Deviation 間建立明確間距（不溢出 sidebar）
     if _sb_dev_pct is not None:
-        _dev_sep = " \u2009"  # space + thin-space for clear but compact gap
         if _sb_dev_pct <= -10:
-            label += f"{_dev_sep}:green[{_sb_dev_pct:+.1f}%]"
+            label += f" :green[**{_sb_dev_pct:+.1f}%**]"
         elif _sb_dev_pct >= 37.5:
-            label += f"{_dev_sep}:red[{_sb_dev_pct:+.1f}%]"
+            label += f" :red[**{_sb_dev_pct:+.1f}%**]"
         elif _sb_dev_pct >= 25:
-            label += f"{_dev_sep}:orange[{_sb_dev_pct:+.1f}%]"
+            label += f" :orange[**{_sb_dev_pct:+.1f}%**]"
         else:
-            label += f"{_dev_sep}:gray[{_sb_dev_pct:+.1f}%]"
+            label += f" :gray[**{_sb_dev_pct:+.1f}%**]"
     
     sidebar_options[label] = ticker
     ticker_to_label[ticker] = label
