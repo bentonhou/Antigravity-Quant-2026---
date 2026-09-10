@@ -344,15 +344,17 @@ for ticker in all_tickers_list:
         label += f" {trend}"
     
     # Append Deviation % with color matching right-side metric card
+    # 使用 em-space (\u2003) 在箭頭與 Deviation 間建立明確間距
     if _sb_dev_pct is not None:
+        _dev_sep = "\u2003"  # em-space for clear gap after arrow
         if _sb_dev_pct <= -10:
-            label += f" :green[{_sb_dev_pct:+.1f}%]"
+            label += f"{_dev_sep}:green[{_sb_dev_pct:+.1f}%]"
         elif _sb_dev_pct >= 37.5:
-            label += f" :red[{_sb_dev_pct:+.1f}%]"
+            label += f"{_dev_sep}:red[{_sb_dev_pct:+.1f}%]"
         elif _sb_dev_pct >= 25:
-            label += f" :orange[{_sb_dev_pct:+.1f}%]"
+            label += f"{_dev_sep}:orange[{_sb_dev_pct:+.1f}%]"
         else:
-            label += f" :gray[{_sb_dev_pct:+.1f}%]"
+            label += f"{_dev_sep}:gray[{_sb_dev_pct:+.1f}%]"
     
     sidebar_options[label] = ticker
     ticker_to_label[ticker] = label
