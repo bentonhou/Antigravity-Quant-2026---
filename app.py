@@ -227,10 +227,10 @@ def calculate_trend(series, window=5):
     # Let's use simple numpy polyfit for robustness
     try:
         slope, _ = np.polyfit(x, y, 1)
-        return "↗" if slope > 0 else "↘"
+        return "↗\uFE0E" if slope > 0 else "↘\uFE0E"
     except:
         # Fallback to simple diff
-        return "↗" if y[-1] >= y[0] else "↘"
+        return "↗\uFE0E" if y[-1] >= y[0] else "↘\uFE0E"
 
 # --- Asset Categories Definition ---
 ASSET_CATEGORIES = {
@@ -275,6 +275,7 @@ with st.spinner("Updating Market Signals..."):
 for ticker in all_tickers_list:
     icon = ":gray[●]"
     trend = ""
+    _sb_dev_pct = None  # sidebar deviation percentage
     try:
         final_price = None
         final_date = None
@@ -320,6 +321,20 @@ for ticker in all_tickers_list:
         if final_price is not None and final_date is not None:
              icon = calculate_status(ticker, final_price, final_date, sentiment_factor, p_start_override=_p_start_corr)
              
+             # 計算 Deviation % (與主圖 Deviation 卡片邏輯一致)
+             _cfg = STOCKS_CONFIG[ticker]
+             _ps = _p_start_corr if _p_start_corr is not None else _cfg["start"]
+             _pt = _cfg["target"] * sentiment_factor
+             _sl = (_pt - _ps) / (TOTAL_DAYS - 1)
+             _calc_date = final_date
+             if hasattr(_calc_date, 'tzinfo') and _calc_date.tzinfo is not None:
+                 _calc_date = _calc_date.replace(tzinfo=None)
+             _dd = (_calc_date - START_DATE).days
+             if 0 <= _dd < TOTAL_DAYS:
+                 _cb = _ps + _sl * _dd
+                 if _cb != 0:
+                     _sb_dev_pct = (final_price - _cb) / _cb * 100
+             
     except Exception:
         pass 
     
@@ -327,6 +342,17 @@ for ticker in all_tickers_list:
     label = f"*{display_name}* {icon}"
     if trend and trend != "ERROR":
         label += f" {trend}"
+    
+    # Append Deviation % with color matching right-side metric card
+    if _sb_dev_pct is not None:
+        if _sb_dev_pct <= -10:
+            label += f" :green[{_sb_dev_pct:+.1f}%]"
+        elif _sb_dev_pct >= 37.5:
+            label += f" :red[{_sb_dev_pct:+.1f}%]"
+        elif _sb_dev_pct >= 25:
+            label += f" :orange[{_sb_dev_pct:+.1f}%]"
+        else:
+            label += f" :gray[{_sb_dev_pct:+.1f}%]"
     
     sidebar_options[label] = ticker
     ticker_to_label[ticker] = label
