@@ -213,10 +213,12 @@ div[class^="stSidebar"] > div[class^="resize-tr"] { display: none !important; }
     align-items: center;
 }
 
-/* Deviation % 數值（:color[] 語法產生的 span）：強制與 Ticker 名稱同字體大小與粗細 */
-[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p span {
+/* Deviation % 數值（:color[] 語法產生的巢狀 span）：強制與 Ticker 名稱同字體大小與粗細 */
+[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p span,
+[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p span span {
     font-size: 16px !important;
     font-weight: bold !important;
+    white-space: nowrap !important; /* 防止 Deviation 文字換行 */
 }
 
 /* Checkbox base typography style to match Y-axis specs (Auto-Refresh) */
