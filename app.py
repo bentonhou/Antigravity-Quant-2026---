@@ -137,14 +137,15 @@ st.markdown("""
     font-weight: normal !important;
     white-space: nowrap !important;
 }
-/* DEBUG: 找圈圈的真實元素 */
-[data-testid="stSidebar"] [data-testid="stRadio"] label > * {
-    outline: 2px solid blue !important;
+/* 點選圈圈：用 emotion-cache class 精準鎖定，調整大小與垂直位置 */
+[data-testid="stSidebar"] [data-testid="stRadio"] label > [class*="st-emotion-cache"]:first-child {
+    transform: scale(0.8) !important;
+    transform-origin: center !important;
+    margin-top: -6px !important;
 }
-[data-testid="stSidebar"] [data-testid="stRadio"] label input[type="radio"] {
-    outline: 4px solid lime !important;
-    opacity: 1 !important;
-    visibility: visible !important;
+/* DEBUG 確認選擇器生效 - 確認後移除 */
+[data-testid="stSidebar"] [data-testid="stRadio"] label > [class*="st-emotion-cache"]:first-child {
+    outline: 3px solid lime !important;
 }
 /* 燈號圖示（●）：大小與垂直對齊與點選圈圈一致 */
 [data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p > span:first-of-type {
