@@ -136,6 +136,14 @@ st.markdown("""
     transform: scale(0.8) translateY(-3px) !important;
     transform-origin: center !important;
 }
+/* 燈號圖示（●）：大小與垂直對齊與點選圈圈一致 */
+[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p > span:first-of-type {
+    font-size: 16px !important;
+    line-height: 1 !important;
+    align-self: center !important;
+    display: inline-flex !important;
+    align-items: center !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
