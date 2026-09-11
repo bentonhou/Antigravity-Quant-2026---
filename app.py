@@ -137,14 +137,8 @@ st.markdown("""
     font-weight: normal !important;
     white-space: nowrap !important;
 }
-/* 點選圈圈：用 emotion-cache class 精準鎖定，調整大小與垂直位置 */
-[data-testid="stSidebar"] [data-testid="stRadio"] label > [class*="st-emotion-cache"]:first-child {
-    transform: scale(0.8) !important;
-    transform-origin: center !important;
-    margin-top: -6px !important;
-}
-/* DEBUG 確認選擇器生效 - 確認後移除 */
-[data-testid="stSidebar"] [data-testid="stRadio"] label > [class*="st-emotion-cache"]:first-child {
+/* 點選圈圈：移除直接子元素限制，改用後代選擇器 */
+[data-testid="stSidebar"] [data-testid="stRadio"] label [class*="st-emotion-cache"]:not([data-testid]) {
     outline: 3px solid lime !important;
 }
 /* 燈號圖示（●）：大小與垂直對齊與點選圈圈一致 */
