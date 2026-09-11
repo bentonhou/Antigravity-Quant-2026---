@@ -109,13 +109,16 @@ st.markdown("""
 /* Ticker 名稱 em 欄位 */
 [data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p em {
     font-style: normal !important;
-    display: inline-block !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    align-self: center !important;
     width: 55px !important;
     border-right: 1px solid rgba(255, 255, 255, 0.4) !important;
     margin-right: 12px !important;
     padding-right: 8px !important;
     font-weight: bold !important;
     color: #ffffff !important;
+    line-height: 1 !important;
 }
 /* 所有 span 防止換行 */
 [data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p span,
