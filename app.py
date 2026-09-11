@@ -137,12 +137,15 @@ st.markdown("""
     font-weight: normal !important;
     white-space: nowrap !important;
 }
-/* 點選圈圈：縮小並垂直置中 */
-[data-testid="stSidebar"] [data-testid="stRadio"] label[data-baseweb="radio"] > div:first-child {
-    transform: scale(0.8) !important;
-    transform-origin: center !important;
-    margin-top: -6px !important;
-    background-color: red !important;
+/* DEBUG: 逐層找正確選擇器 */
+[data-testid="stSidebar"] [data-testid="stRadio"] label {
+    outline: 3px solid red !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] label > div:first-child {
+    background-color: blue !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] label > *:first-child {
+    background-color: green !important;
 }
 /* 燈號圖示（●）：大小與垂直對齊與點選圈圈一致 */
 [data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p > span:first-of-type {
