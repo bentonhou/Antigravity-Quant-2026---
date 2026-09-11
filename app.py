@@ -139,7 +139,7 @@ st.markdown("""
 }
 /* 點選圈圈：縮小並垂直置中 */
 [data-testid="stSidebar"] [data-testid="stRadio"] label[data-baseweb="radio"] > div:first-child {
-    transform: scale(0.8) translateY(-3px) !important;
+    transform: scale(0.8) translateY(-5px) !important;
     transform-origin: center !important;
 }
 /* 燈號圖示（●）：大小與垂直對齊與點選圈圈一致 */
