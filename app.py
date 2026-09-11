@@ -137,9 +137,14 @@ st.markdown("""
     font-weight: normal !important;
     white-space: nowrap !important;
 }
-/* 點選圈圈：確認正確選擇器後套用位置修正 */
+/* 點選圈圈：縮小並垂直置中（transform 不影響 layout flow，不會擠壓其他行） */
 [data-testid="stSidebar"] [data-testid="stRadio"] label [class*="st-emotion-cache"]:not([data-testid]) > [class*="st-emotion-cache"]:first-child {
-    margin-top: -6px !important;
+    transform: scale(0.75) translateY(-3px) !important;
+    transform-origin: center !important;
+}
+/* 行距縮小（用 gap 控制，不影響各元素的個別 layout） */
+[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] div[role="radiogroup"] {
+    gap: 1px !important;
 }
 /* 燈號圖示（●）：大小與垂直對齊與點選圈圈一致 */
 [data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p > span:first-of-type {
