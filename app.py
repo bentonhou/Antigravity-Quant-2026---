@@ -137,9 +137,10 @@ st.markdown("""
     font-weight: normal !important;
     white-space: nowrap !important;
 }
-/* 點選圈圈：移除直接子元素限制，改用後代選擇器 */
-[data-testid="stSidebar"] [data-testid="stRadio"] label [class*="st-emotion-cache"]:not([data-testid]) {
+/* 點選圈圈：在外層 emotion-cache 內找第一個子元素（即圈圈） */
+[data-testid="stSidebar"] [data-testid="stRadio"] label [class*="st-emotion-cache"]:not([data-testid]) > [class*="st-emotion-cache"]:first-child {
     outline: 3px solid lime !important;
+    background: red !important;
 }
 /* 燈號圖示（●）：大小與垂直對齊與點選圈圈一致 */
 [data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p > span:first-of-type {
