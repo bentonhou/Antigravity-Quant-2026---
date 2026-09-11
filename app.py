@@ -142,6 +142,7 @@ st.markdown("""
     transform: scale(0.8) !important;
     transform-origin: center !important;
     margin-top: -6px !important;
+    background-color: red !important;
 }
 /* 燈號圖示（●）：大小與垂直對齊與點選圈圈一致 */
 [data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p > span:first-of-type {
