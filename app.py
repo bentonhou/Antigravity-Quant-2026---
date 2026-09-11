@@ -120,8 +120,14 @@ st.markdown("""
     color: #ffffff !important;
     line-height: 1 !important;
 }
-/* 所有 span 防止換行 */
-[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p span,
+/* 所有 span 防止換行、統一垂直置中 */
+[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p > span {
+    white-space: nowrap !important;
+    align-self: center !important;
+    line-height: 1 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+}
 [data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p span span {
     white-space: nowrap !important;
 }
@@ -393,7 +399,7 @@ for ticker in all_tickers_list:
     display_name = f"{ticker}_" if ticker in ("NOK", "TTD") else ticker
     label = f"*{display_name}* {icon}"
     if trend and trend != "ERROR":
-        label += f" {trend}"
+        label += f" :gray[{trend}]"  # 用 :gray[] 包裹，產生 <span> 以便 flex 正確置中
     
     # Append Deviation % with color matching right-side metric card
     # 使用 thin-space (\u2009) 在箭頭與 Deviation 間建立明確間距（不溢出 sidebar）
