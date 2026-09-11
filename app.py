@@ -141,6 +141,10 @@ st.markdown("""
 [data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] div[role="radiogroup"] {
     gap: 1px !important;
 }
+/* 文字側往下 3px，對齊左側圈圈的自然位置 */
+[data-testid="stSidebar"] [data-testid="stRadio"] label [data-testid="stMarkdownContainer"] {
+    margin-top: 3px !important;
+}
 /* 燈號圖示（●）：大小與垂直對齊與點選圈圈一致 */
 [data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p > span:first-of-type {
     font-size: 16px !important;
