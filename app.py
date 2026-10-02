@@ -49,6 +49,7 @@ STOCKS_CONFIG = {
     "COHR": {"start": 319.19, "target": 411.0},
     "CIEN": {"start": 379.14, "target": 507.0},
     "LITE": {"start": 1045.78, "target": 1073.0},
+    "IBM":  {"start": 296.21, "target": 250.0},
 }
 
 # --- Target Price Meta File ---
@@ -302,7 +303,7 @@ ASSET_CATEGORIES = {
     "Chips": ["NVDA", "AMD", "AVGO", "MRVL", "QCOM", "INTC", "TSM", "UMC", "MU", "SNDK"],
     "Compute Infrastructure": ["ANET", "NOK", "DELL", "HPE", "GLW", "COHR", "CIEN", "LITE"],
     "AI Factory / Cloud": ["CRWV", "NBIS"],
-    "Models / AI Platforms": ["MSFT", "GOOG", "AMZN"],
+    "Models / AI Platforms": ["MSFT", "GOOG", "AMZN", "IBM"],
     "Applications": ["NOW", "CRM", "CRWD", "TTD", "MRK"],
 }
 
