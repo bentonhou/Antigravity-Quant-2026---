@@ -46,6 +46,9 @@ STOCKS_CONFIG = {
     "MRK":  {"start": 104.91, "target": 149.5},
     "MU":   {"start": 315.24, "target": 1513.1},
     "SNDK": {"start": 275.24, "target": 2125.1},
+    "COHR": {"start": 319.19, "target": 411.0},
+    "CIEN": {"start": 379.14, "target": 507.0},
+    "LITE": {"start": 1045.78, "target": 1073.0},
 }
 
 # --- Target Price Meta File ---
@@ -297,7 +300,7 @@ def calculate_trend(series, window=5):
 ASSET_CATEGORIES = {
     "Energy": ["ETN"],
     "Chips": ["NVDA", "AMD", "AVGO", "MRVL", "QCOM", "INTC", "TSM", "UMC", "MU", "SNDK"],
-    "Compute Infrastructure": ["ANET", "NOK", "DELL", "HPE", "GLW"],
+    "Compute Infrastructure": ["ANET", "NOK", "DELL", "HPE", "GLW", "COHR", "CIEN", "LITE"],
     "AI Factory / Cloud": ["CRWV", "NBIS"],
     "Models / AI Platforms": ["MSFT", "GOOG", "AMZN"],
     "Applications": ["NOW", "CRM", "CRWD", "TTD", "MRK"],
