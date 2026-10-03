@@ -298,33 +298,43 @@ def calculate_trend(series, window=5):
         return "↗\uFE0E" if y[-1] >= y[0] else "↘\uFE0E"
 
 # --- Asset Categories Definition ---
-# 依 Finviz 股票地圖第一階 Sector 分組，資料來源 finviz.com，查詢日期 2026-10-03
-# Sector 內依 Industry 排列（註解標示），同 Industry 內依市值由大到小
+# 依 Finviz 股票地圖兩階分類：Sector → Industry，資料來源 finviz.com，查詢日期 2026-10-03
+# 同 Industry 內依市值由大到小排序（對應 Finviz 地圖方塊大小）
 ASSET_CATEGORIES = {
-    "Technology": [
-        "NVDA", "AVGO", "TSM", "AMD", "MU", "QCOM", "INTC", "MRVL", "UMC",  # Semiconductors
-        "MSFT", "CRWD", "NBIS", "CRWV",                                     # Software - Infrastructure
-        "CRM", "NOW",                                                       # Software - Application
-        "ANET", "DELL", "SNDK",                                             # Computer Hardware
-        "CIEN", "LITE", "HPE", "NOK",                                       # Communication Equipment
-        "GLW",                                                              # Electronic Components
-        "COHR",                                                             # Scientific & Technical Instruments
-        "IBM",                                                              # Information Technology Services
-    ],
-    "Communication Services": [
-        "GOOG",  # Internet Content & Information
-        "TTD",   # Advertising Agencies
-    ],
-    "Consumer Cyclical": ["AMZN"],  # Internet Retail
-    "Industrials": ["ETN"],         # Specialty Industrial Machinery
-    "Healthcare": ["MRK"],          # Drug Manufacturers - General
+    "Technology": {
+        "Semiconductors":                     ["NVDA", "AVGO", "TSM", "AMD", "MU", "QCOM", "INTC", "MRVL", "UMC"],
+        "Software - Infrastructure":          ["MSFT", "CRWD", "NBIS", "CRWV"],
+        "Software - Application":             ["CRM", "NOW"],
+        "Computer Hardware":                  ["ANET", "DELL", "SNDK"],
+        "Communication Equipment":            ["CIEN", "LITE", "HPE", "NOK"],
+        "Electronic Components":              ["GLW"],
+        "Scientific & Technical Instruments": ["COHR"],
+        "Information Technology Services":    ["IBM"],
+    },
+    "Communication Services": {
+        "Internet Content & Information": ["GOOG"],
+        "Advertising Agencies":           ["TTD"],
+    },
+    "Consumer Cyclical": {"Internet Retail": ["AMZN"]},
+    "Industrials":       {"Specialty Industrial Machinery": ["ETN"]},
+    "Healthcare":        {"Drug Manufacturers - General": ["MRK"]},
 }
+
+def _safe_id(s):
+    return "".join(c if c.isascii() and c.isalnum() else "_" for c in s)
+
+# 每個 (Sector, Industry) 為一個 radio 群組；key 用於 session_state
+ASSET_GROUPS = [
+    (_safe_id(f"{_sec}__{_ind}"), _sec, _ind, _tks)
+    for _sec, _inds in ASSET_CATEGORIES.items()
+    for _ind, _tks in _inds.items()
+]
 
 # --- Sidebar Preparation ---
 
 # Flatten categories in structured order
 all_tickers_list = []
-for _cat_tickers in ASSET_CATEGORIES.values():
+for _gkey, _sec, _ind, _cat_tickers in ASSET_GROUPS:
     for _t in _cat_tickers:
         if _t in STOCKS_CONFIG and _t not in all_tickers_list:
             all_tickers_list.append(_t)
@@ -443,17 +453,20 @@ st.sidebar.markdown("<h2>Asset Selection</h2>", unsafe_allow_html=True)
 if "selected_ticker" not in st.session_state or st.session_state.selected_ticker not in STOCKS_CONFIG:
     st.session_state.selected_ticker = "TSM"
 
-def _on_category_radio_change(cat_key):
-    _chosen_lbl = st.session_state.get(f"radio_{cat_key}")
+def _on_category_radio_change(group_key):
+    _chosen_lbl = st.session_state.get(f"radio_{group_key}")
     if _chosen_lbl and _chosen_lbl in sidebar_options:
         st.session_state.selected_ticker = sidebar_options[_chosen_lbl]
-        for _other_cat in ASSET_CATEGORIES:
-            if _other_cat != cat_key:
-                st.session_state[f"radio_{_other_cat}"] = None
+        for _other_key, _s, _i, _t in ASSET_GROUPS:
+            if _other_key != group_key:
+                st.session_state[f"radio_{_other_key}"] = None
 
-for cat_name, cat_tickers in ASSET_CATEGORIES.items():
+cur_label = ticker_to_label.get(st.session_state.selected_ticker)
+
+for cat_name, industries in ASSET_CATEGORIES.items():
     with st.sidebar.container(border=True):
-        cat_id = "".join(c if c.isascii() and c.isalnum() else "_" for c in cat_name)
+        # 第一階：Sector 標題（右上角，橘色）
+        cat_id = _safe_id(cat_name)
         _cat_html = cat_name.replace("&", "&amp;")
         st.markdown(
             f'<style>'
@@ -471,19 +484,42 @@ for cat_name, cat_tickers in ASSET_CATEGORIES.items():
             f'</div>',
             unsafe_allow_html=True
         )
-        cat_labels = [ticker_to_label[t] for t in cat_tickers if t in ticker_to_label]
-        cur_label = ticker_to_label.get(st.session_state.selected_ticker)
-        cat_idx = cat_labels.index(cur_label) if cur_label in cat_labels else None
 
-        st.radio(
-            cat_name,
-            cat_labels,
-            index=cat_idx,
-            key=f"radio_{cat_name}",
-            on_change=_on_category_radio_change,
-            args=(cat_name,),
-            label_visibility="collapsed"
-        )
+        for ind_name, ind_tickers in industries.items():
+            group_key = _safe_id(f"{cat_name}__{ind_name}")
+            ind_labels = [ticker_to_label[t] for t in ind_tickers if t in ticker_to_label]
+            if not ind_labels:
+                continue
+
+            # 第二階：Industry 子標題（左側，灰色小字）
+            _ind_html = ind_name.replace("&", "&amp;")
+            st.markdown(
+                f'<style>'
+                f'#ind-title-{group_key}#ind-title-{group_key} {{'
+                f'  color: #9e9e9e !important;'
+                f'  -webkit-text-fill-color: #9e9e9e !important;'
+                f'  font-size: 10px !important;'
+                f'  font-weight: 400 !important;'
+                f'  letter-spacing: 0.3px !important;'
+                f'  line-height: 1.2 !important;'
+                f'}}'
+                f'</style>'
+                f'<div style="width: 100%; margin: 4px 0 0 0; padding: 0 0 1px 0; border-bottom: 1px solid #2a2a2e;">'
+                f'<span id="ind-title-{group_key}">{_ind_html}</span>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+
+            ind_idx = ind_labels.index(cur_label) if cur_label in ind_labels else None
+            st.radio(
+                f"{cat_name} - {ind_name}",
+                ind_labels,
+                index=ind_idx,
+                key=f"radio_{group_key}",
+                on_change=_on_category_radio_change,
+                args=(group_key,),
+                label_visibility="collapsed"
+            )
 
 selected_ticker = st.session_state.selected_ticker
 
