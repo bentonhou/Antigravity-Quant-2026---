@@ -298,13 +298,26 @@ def calculate_trend(series, window=5):
         return "↗\uFE0E" if y[-1] >= y[0] else "↘\uFE0E"
 
 # --- Asset Categories Definition ---
+# 依 Finviz 股票地圖第一階 Sector 分組，資料來源 finviz.com，查詢日期 2026-10-03
+# Sector 內依 Industry 排列（註解標示），同 Industry 內依市值由大到小
 ASSET_CATEGORIES = {
-    "Energy": ["ETN"],
-    "Chips": ["NVDA", "AMD", "AVGO", "MRVL", "QCOM", "INTC", "TSM", "UMC", "MU", "SNDK"],
-    "Compute Infrastructure": ["ANET", "NOK", "DELL", "HPE", "GLW", "COHR", "CIEN", "LITE"],
-    "AI Factory / Cloud": ["CRWV", "NBIS"],
-    "Models / AI Platforms": ["MSFT", "GOOG", "AMZN", "IBM"],
-    "Applications": ["NOW", "CRM", "CRWD", "TTD", "MRK"],
+    "Technology": [
+        "NVDA", "AVGO", "TSM", "AMD", "MU", "QCOM", "INTC", "MRVL", "UMC",  # Semiconductors
+        "MSFT", "CRWD", "NBIS", "CRWV",                                     # Software - Infrastructure
+        "CRM", "NOW",                                                       # Software - Application
+        "ANET", "DELL", "SNDK",                                             # Computer Hardware
+        "CIEN", "LITE", "HPE", "NOK",                                       # Communication Equipment
+        "GLW",                                                              # Electronic Components
+        "COHR",                                                             # Scientific & Technical Instruments
+        "IBM",                                                              # Information Technology Services
+    ],
+    "Communication Services": [
+        "GOOG",  # Internet Content & Information
+        "TTD",   # Advertising Agencies
+    ],
+    "Consumer Cyclical": ["AMZN"],  # Internet Retail
+    "Industrials": ["ETN"],         # Specialty Industrial Machinery
+    "Healthcare": ["MRK"],          # Drug Manufacturers - General
 }
 
 # --- Sidebar Preparation ---
@@ -440,7 +453,8 @@ def _on_category_radio_change(cat_key):
 
 for cat_name, cat_tickers in ASSET_CATEGORIES.items():
     with st.sidebar.container(border=True):
-        cat_id = cat_name.replace(" ", "_").replace("/", "_")
+        cat_id = "".join(c if c.isascii() and c.isalnum() else "_" for c in cat_name)
+        _cat_html = cat_name.replace("&", "&amp;")
         st.markdown(
             f'<style>'
             f'#cat-title-{cat_id}#cat-title-{cat_id} {{'
@@ -453,7 +467,7 @@ for cat_name, cat_tickers in ASSET_CATEGORIES.items():
             f'}}'
             f'</style>'
             f'<div style="display: flex; justify-content: flex-end; width: 100%; margin: 0 0 2px 0; padding: 0;">'
-            f'<span id="cat-title-{cat_id}" class="asset-card-title">{cat_name}</span>'
+            f'<span id="cat-title-{cat_id}" class="asset-card-title">{_cat_html}</span>'
             f'</div>',
             unsafe_allow_html=True
         )
