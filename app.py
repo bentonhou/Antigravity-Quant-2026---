@@ -157,6 +157,34 @@ st.markdown("""
     display: inline-flex !important;
     align-items: center !important;
 }
+/* 側邊欄分類標題：第一階 Sector（橘色、靠左、12px） */
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] span.sector-title {
+    display: block !important;
+    width: 100% !important;
+    text-align: left !important;
+    color: #FF9800 !important;
+    -webkit-text-fill-color: #FF9800 !important;
+    font-size: 12px !important;
+    font-weight: 200 !important;
+    letter-spacing: 0.5px !important;
+    line-height: 1.2 !important;
+    margin: 0 0 2px 0 !important;
+}
+/* 側邊欄分類標題：第二階 Industry（灰色、靠左、10px、底部細線） */
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] span.industry-title {
+    display: block !important;
+    width: 100% !important;
+    text-align: left !important;
+    color: #9e9e9e !important;
+    -webkit-text-fill-color: #9e9e9e !important;
+    font-size: 10px !important;
+    font-weight: 400 !important;
+    letter-spacing: 0.3px !important;
+    line-height: 1.2 !important;
+    margin: 4px 0 0 0 !important;
+    padding: 0 0 1px 0 !important;
+    border-bottom: 1px solid #2a2a2e !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -465,25 +493,10 @@ cur_label = ticker_to_label.get(st.session_state.selected_ticker)
 
 for cat_name, industries in ASSET_CATEGORIES.items():
     with st.sidebar.container(border=True):
-        # 第一階：Sector 標題（右上角，橘色）
-        cat_id = _safe_id(cat_name)
+        # 第一階：Sector 標題（樣式見頂部 span.sector-title）
+        # 註：不使用 .asset-card-title，因 ui_styles.css 對其強制 10px + 靠右
         _cat_html = cat_name.replace("&", "&amp;")
-        st.markdown(
-            f'<style>'
-            f'#cat-title-{cat_id}#cat-title-{cat_id} {{'
-            f'  color: #FF9800 !important;'
-            f'  -webkit-text-fill-color: #FF9800 !important;'
-            f'  font-size: 10px !important;'
-            f'  font-weight: 200 !important;'
-            f'  letter-spacing: 0.5px !important;'
-            f'  line-height: 1.2 !important;'
-            f'}}'
-            f'</style>'
-            f'<div style="display: flex; justify-content: flex-end; width: 100%; margin: 0 0 2px 0; padding: 0;">'
-            f'<span id="cat-title-{cat_id}" class="asset-card-title">{_cat_html}</span>'
-            f'</div>',
-            unsafe_allow_html=True
-        )
+        st.markdown(f'<span class="sector-title">{_cat_html}</span>', unsafe_allow_html=True)
 
         for ind_name, ind_tickers in industries.items():
             group_key = _safe_id(f"{cat_name}__{ind_name}")
@@ -491,24 +504,9 @@ for cat_name, industries in ASSET_CATEGORIES.items():
             if not ind_labels:
                 continue
 
-            # 第二階：Industry 子標題（左側，灰色小字）
+            # 第二階：Industry 子標題（樣式見頂部 span.industry-title）
             _ind_html = ind_name.replace("&", "&amp;")
-            st.markdown(
-                f'<style>'
-                f'#ind-title-{group_key}#ind-title-{group_key} {{'
-                f'  color: #9e9e9e !important;'
-                f'  -webkit-text-fill-color: #9e9e9e !important;'
-                f'  font-size: 10px !important;'
-                f'  font-weight: 400 !important;'
-                f'  letter-spacing: 0.3px !important;'
-                f'  line-height: 1.2 !important;'
-                f'}}'
-                f'</style>'
-                f'<div style="width: 100%; margin: 4px 0 0 0; padding: 0 0 1px 0; border-bottom: 1px solid #2a2a2e;">'
-                f'<span id="ind-title-{group_key}">{_ind_html}</span>'
-                f'</div>',
-                unsafe_allow_html=True
-            )
+            st.markdown(f'<span class="industry-title">{_ind_html}</span>', unsafe_allow_html=True)
 
             ind_idx = ind_labels.index(cur_label) if cur_label in ind_labels else None
             st.radio(
