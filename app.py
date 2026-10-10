@@ -1075,6 +1075,23 @@ layout_kwargs.update({
 
 fig.update_layout(**layout_kwargs)
 
+# --- Baseline 年化報酬率（基礎斜率量化）：顯示於圖表右下角 ---
+# 本年報酬率 = (年末目標價 - 起點) / 起點，使用 Base Baseline (Sentiment = 1.0)
+_annual_return_pct = (p_target_base - p_start) / p_start * 100 if p_start else 0.0
+fig.add_annotation(
+    x=0.99, y=0.02,
+    xref="paper", yref="paper",
+    xanchor="right", yanchor="bottom",
+    text=f"<b>{_annual_return_pct:+.2f}%</b>",
+    showarrow=False,
+    font=dict(
+        family="'Myriad Pro', 'Microsoft JhengHei', sans-serif",
+        size=36,
+        color="#ffffff"
+    ),
+    align="right"
+)
+
 # RENDER CHART IN CONTAINER
 # If chart_space was defined earlier (inside the if), use it. But fig creation is outside.
 # Let's clean up structure. 
