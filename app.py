@@ -1078,10 +1078,17 @@ fig.update_layout(**layout_kwargs)
 # --- Baseline 年化報酬率（基礎斜率量化）：顯示於圖表右下角 ---
 # 本年報酬率 = (年末目標價 - 起點) / 起點，使用 Base Baseline (Sentiment = 1.0)
 _annual_return_pct = (p_target_base - p_start) / p_start * 100 if p_start else 0.0
+
+# --- 目前股價換算之本年報酬率：(目前股價 - 起點) / 起點，綠字括弧顯示於上方數字下方 ---
+# current_price 已包含盤前/盤後價格（若擴展時段生效）
+_curr_return_pct = (current_price - p_start) / p_start * 100 if (p_start and current_price) else None
+_has_curr_return = _curr_return_pct is not None
+
 fig.add_annotation(
     x=0.99, y=0.02,
     xref="paper", yref="paper",
     xanchor="right", yanchor="bottom",
+    yshift=24 if _has_curr_return else 0,  # 預留下方綠字空間
     text=f"<b>{_annual_return_pct:+.2f}%</b>",
     showarrow=False,
     font=dict(
@@ -1091,6 +1098,21 @@ fig.add_annotation(
     ),
     align="right"
 )
+
+if _has_curr_return:
+    fig.add_annotation(
+        x=0.99, y=0.02,
+        xref="paper", yref="paper",
+        xanchor="right", yanchor="bottom",
+        text=f"<b>({_curr_return_pct:+.2f}%)</b>",
+        showarrow=False,
+        font=dict(
+            family="'Myriad Pro', 'Microsoft JhengHei', sans-serif",
+            size=16,
+            color="#80CF59"  # 同 .pre-market-text 綠字
+        ),
+        align="right"
+    )
 
 # RENDER CHART IN CONTAINER
 # If chart_space was defined earlier (inside the if), use it. But fig creation is outside.
